@@ -9,7 +9,8 @@ import { formatINR } from "./money";
 import { kidsLabel } from "./messages";
 
 export async function getSettings() {
-  const s = await db.settings.findUnique({ where: { id: 1 } });
+  // Never let the root layout crash: fall back to defaults if the database is unavailable.
+  const s = process.env.DATABASE_URL ? await db.settings.findUnique({ where: { id: 1 } }).catch(() => null) : null;
   return (
     s ?? {
       id: 1,

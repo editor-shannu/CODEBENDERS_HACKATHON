@@ -24,6 +24,7 @@ export function ChaseQueue({ cards }: { cards: QueueCard[] }) {
   const [dx, setDx] = useState(0);
   const [remindFor, setRemindFor] = useState<QueueCard | null>(null);
   const startX = useRef<number | null>(null);
+  const [dragging, setDragging] = useState(false);
   const top = queue[0];
 
   const snooze = () => setQueue((q) => [...q.slice(1), q[0]]);
@@ -42,6 +43,7 @@ export function ChaseQueue({ cards }: { cards: QueueCard[] }) {
     else if (dx < -90) snooze();
     setDx(0);
     startX.current = null;
+    setDragging(false);
   };
 
   return (
@@ -52,8 +54,8 @@ export function ChaseQueue({ cards }: { cards: QueueCard[] }) {
         ))}
         <div
           className="swipe-card ruled-paper absolute inset-0 cursor-grab border border-ink/20 p-5 text-ink active:cursor-grabbing"
-          style={{ transform: `translateX(${dx}px) rotate(${dx / 30}deg)`, transition: startX.current === null ? "transform .2s" : "none" }}
-          onPointerDown={(e) => { startX.current = e.clientX; (e.target as HTMLElement).setPointerCapture?.(e.pointerId); }}
+          style={{ transform: `translateX(${dx}px) rotate(${dx / 30}deg)`, transition: dragging ? "none" : "transform .2s" }}
+          onPointerDown={(e) => { startX.current = e.clientX; setDragging(true); (e.target as HTMLElement).setPointerCapture?.(e.pointerId); }}
           onPointerMove={(e) => startX.current !== null && setDx(e.clientX - startX.current)}
           onPointerUp={onUp}
           onPointerCancel={onUp}
