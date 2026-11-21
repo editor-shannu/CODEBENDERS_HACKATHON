@@ -1,50 +1,50 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import Link from "next/link";
 import { Fraunces, IBM_Plex_Mono } from "next/font/google";
 import BottomNav from "@/components/nav/BottomNav";
+import { getSettings } from "@/lib/data";
+import { formatDate, todayIST } from "@/lib/dates";
 import "./globals.css";
 
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const plexMono = IBM_Plex_Mono({
-  weight: ["400", "500", "600"],
-  variable: "--font-plex-mono",
-  subsets: ["latin"],
-});
+const fraunces = Fraunces({ variable: "--font-fraunces", subsets: ["latin"], display: "swap", axes: ["SOFT", "opsz"] });
+const plexMono = IBM_Plex_Mono({ weight: ["400", "500", "600"], variable: "--font-plex-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Baaki",
-  description: "Baaki — fee tracking for Lakshmi Teaching Point",
+  description: "Baaki: the back office for home tutors. Who owes, what's coming, and an AI clerk that chases for you.",
+  applicationName: "Baaki",
+  appleWebApp: { capable: true, title: "Baaki", statusBarStyle: "black-translucent" },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
-  const today = new Intl.DateTimeFormat("en-IN", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "Asia/Kolkata",
-  }).format(new Date());
+export const viewport: Viewport = { themeColor: "#0E0E0E", width: "device-width", initialScale: 1 };
+export const dynamic = "force-dynamic";
 
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const settings = await getSettings();
+  const today = formatDate(todayIST());
   return (
     <html lang="en" className={`${fraunces.variable} ${plexMono.variable}`}>
-      <body className="min-h-dvh flex flex-col pb-24">
-        <header className="border-b border-ledger/20 px-4 py-4">
-          <div className="mx-auto w-full max-w-5xl">
-            <p className="font-display text-2xl">Lakshmi Teaching Point</p>
-            <p className="font-mono text-sm text-ledger/70">{today}</p>
+      <body className="flex min-h-dvh flex-col pb-24">
+        <header className="border-b border-ledger/15 px-4 py-3">
+          <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3">
+            <Link href="/" className="flex items-baseline gap-3">
+              <span className="font-display text-2xl italic text-turmeric">Baaki</span>
+              <span className="hidden font-display text-lg sm:inline">{settings.centreName}</span>
+            </Link>
+            <div className="flex items-center gap-4">
+              <span className="font-mono text-xs text-ledger/70">{today}</span>
+              <Link href="/settings" className="font-mono text-[11px] uppercase tracking-[0.14em] text-ledger/70 hover:text-turmeric">
+                Settings
+              </Link>
+            </div>
           </div>
         </header>
-        <main className="flex-1 px-4 py-6 mx-auto w-full max-w-5xl">{children}</main>
-        <footer className="px-4 pb-3 text-center font-mono text-xs text-ink-muted">
-          Demo data
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
+        <footer className="px-4 pb-4 text-center font-mono text-[11px] text-ink-muted">
+          {settings.centreName}, {settings.city} · Demo data (synthetic) · Built with Codebenders
         </footer>
         <BottomNav />
       </body>
     </html>
   );
 }
-

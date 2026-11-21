@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Money is stored as whole rupees (Int). "Enum" fields are strings validated with Zod.
+
+model Settings {
+  id              Int    @id @default(1)
+  tutorName       String
+  centreName      String
+  city            String @default("Vizianagaram")
+  upiId           String
+  upiName         String
+  startingBalance Int    @default(0)
+  autonomy        String @default("ASK") // SUGGEST | ASK | AUTO
+}
+
+model Family {
+  id         String      @id @default(cuid())
+  parentName String
+  phone      String
+  language   String      @default("te") // en | te | hi
+  notes      String      @default("")
+  memory     String      @default("{}") // Munshi's learned notes (JSON)
+  createdAt  DateTime    @default(now())
+  students   Student[]
+  invoices   Invoice[]
+  promises   PayPromise[]
+  reminders  Reminder[]
+}
+
+model Student {
+  id         String  @id @default(cuid())
+  familyId   String
+  family     Family  @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  name       String
+  batch      String
+  monthlyFee Int
+  dueDay     Int
+  active     Boolean @default(true)
+}
+
+model Invoice {
+  id        String         @id @default(cuid())
+  number    String         @unique
+  familyId  String
+  family    Family         @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  month     String // YYYY-MM
+  amount    Int
+  discount  Int            @default(0)
+  dueDate   DateTime
+  status    String         @default("SENT") // DRAFT | SENT | PARTIAL | PAID
+  payToken  String         @unique
+  lines     String         @default("[]") // JSON snapshot of students and fees
+  createdAt DateTime       @default(now())
+  payments  Payment[]
+  claims    PaymentClaim[]
+
+  @@unique([familyId, month])
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount    Int
+  date      DateTime
+  mode      String // CASH | UPI
+  reference String?
+  createdAt DateTime @default(now())
+}
+
+model PaymentClaim {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount    Int
+  reference String
+  status    String   @default("PENDING") // PENDING | CONFIRMED | REJECTED
+  createdAt DateTime @default(now())
+}
+
+model PayPromise {
+  id           String   @id @default(cuid())
+  familyId     String
+  family       Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  promisedDate DateTime
+  amount       Int
+  kept         Boolean?
+  source       String   @default("MANUAL") // MANUAL | MUNSHI
+  note         String   @default("")
+  createdAt    DateTime @default(now())
+}
+
+model Reminder {
+  id       String   @id @default(cuid())
+  familyId String
+  family   Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  tone     String // GENTLE | FIRM | FINAL
+  language String
+  sentAt   DateTime @default(now())
+}
+
+model Bill {
+  id        String  @id @default(cuid())
+  name      String
+  amount    Int
+  dueDay    Int
+  recurring Boolean @default(true)
+  flexible  Boolean @default(false)
+  deferDays Int     @default(0)
+}
+
+model KeyDate {
+  id               String   @id @default(cuid())
+  name             String
+  startDate        DateTime
+  endDate          DateTime
+  collectionFactor Float    @default(0.6)
+}
+
+model AgentPlan {
+  id        String        @id @default(cuid())
+  title     String
+  goal      String
+  status    String        @default("PROPOSED") // PROPOSED | ACTIVE | DONE | DISMISSED
+  createdAt DateTime      @default(now())
+  actions   AgentAction[]
+}
+
+model AgentAction {
+  id        String     @id @default(cuid())
+  type      String // REMIND | FOLLOW_UP | DISCOUNT | DEFER_BILL | DUE_DATE | PROMISE | NOTE
+  familyId  String?
+  title     String
+  detail    String     @default("")
+  reason    String     @default("")
+  payload   String     @default("{}")
+  status    String     @default("PENDING") // PENDING | APPROVED | DONE | SKIPPED
+  source    String     @default("RULES") // RULES | AI
+  planId    String?
+  plan      AgentPlan? @relation(fields: [planId], references: [id], onDelete: Cascade)
+  step      Int?
+  createdAt DateTime   @default(now())
+}

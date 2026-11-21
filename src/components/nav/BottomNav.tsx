@@ -2,21 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Receipt, Settings, Users, Wallet, type LucideIcon } from "lucide-react";
+import { Bot, Home, LineChart, Receipt, Users, Wallet, type LucideIcon } from "lucide-react";
 
 const LINKS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/owes", label: "Owes", icon: Wallet },
+  { href: "/forecast", label: "Forecast", icon: LineChart },
+  { href: "/munshi", label: "Munshi", icon: Bot },
   { href: "/students", label: "Students", icon: Users },
   { href: "/invoices", label: "Invoices", icon: Receipt },
-  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-ledger/20 bg-ink">
+    <nav className="no-print fixed inset-x-0 bottom-0 z-50 border-t border-ledger/20 bg-ink pb-[env(safe-area-inset-bottom)]">
       <ul className="mx-auto flex w-full max-w-5xl justify-around">
         {LINKS.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -25,7 +26,7 @@ export default function BottomNav() {
               <Link
                 href={href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-11 flex-col items-center justify-center gap-1 text-xs ${
+                className={`flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] uppercase tracking-wider sm:text-xs ${
                   active ? "text-turmeric" : "text-ledger/70"
                 }`}
               >

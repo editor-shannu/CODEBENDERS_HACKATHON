@@ -70,3 +70,30 @@ body {
 .hairline {
   border: 1px solid rgba(14, 14, 14, 0.2);
 }
+
+/* ---------- Ledger Noir additions ---------- */
+html { -webkit-tap-highlight-color: transparent; }
+body { font-feature-settings: "ss01"; }
+::selection { background: var(--color-turmeric); color: var(--color-ink); }
+
+.stamp { mix-blend-mode: multiply; }
+.bg-ink .stamp, .text-ledger .stamp { mix-blend-mode: normal; }
+
+@keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: no-preference) {
+  .sheet-in { animation: sheet-in 0.18s ease-out; }
+  .tick-in { animation: sheet-in 0.25s ease-out; }
+}
+
+.late-bar { background: repeating-linear-gradient(90deg, var(--color-khata) 0 6px, transparent 6px 8px); }
+.hairline-b { border-bottom: 1px solid rgba(14, 14, 14, 0.12); }
+.big-number { font-family: var(--font-mono); font-weight: 600; letter-spacing: -0.04em; line-height: 0.9; }
+.swipe-card { touch-action: pan-y; }
+.grid-bento { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 768px) { .grid-bento { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; } }
+
+@media print {
+  body { background: white !important; color: black !important; padding: 0 !important; }
+  header, footer, nav, .no-print { display: none !important; }
+  main { padding: 0 !important; max-width: none !important; }
+}
