@@ -4,6 +4,8 @@ import { MoneyText } from "@/components/ui/MoneyText";
 import { RemindButton } from "@/components/actions/RemindButton";
 import { ChaseQueue, type QueueCard } from "@/components/owes/ChaseQueue";
 import { loadDashboard } from "@/lib/board-view";
+import { dbHealth } from "@/lib/db-health";
+import { SetupNotice } from "@/components/setup/SetupNotice";
 import { formatMonthShort, formatDate } from "@/lib/dates";
 import { formatINR } from "@/lib/money";
 import { memoryOf } from "@/lib/munshi/rules";
@@ -12,6 +14,8 @@ import { kidsLabel } from "@/lib/messages";
 export const dynamic = "force-dynamic";
 
 export default async function OwesPage() {
+  const health = await dbHealth();
+  if (!health.ok) return <SetupNotice health={health} />;
   const { board, payloads } = await loadDashboard();
   const owing = board.families.filter((f) => f.stats.balance > 0).sort((a, b) => b.stats.oldestDaysLate - a.stats.oldestDaysLate);
   const maxLate = Math.max(30, ...owing.map((f) => f.stats.oldestDaysLate));

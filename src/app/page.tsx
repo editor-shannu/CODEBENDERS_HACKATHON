@@ -6,12 +6,16 @@ import { WeatherStrip } from "@/components/forecast/Weather";
 import { RemindButton } from "@/components/actions/RemindButton";
 import { BriefActions } from "@/components/munshi/BriefActions";
 import { loadDashboard } from "@/lib/board-view";
+import { dbHealth } from "@/lib/db-health";
+import { SetupNotice } from "@/components/setup/SetupNotice";
 import { formatDate, fromKey, daysBetween, toKey } from "@/lib/dates";
 import { formatINR } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
+  const health = await dbHealth();
+  if (!health.ok) return <SetupNotice health={health} />;
   const { board, forecast, brief, payloads, pendingClaims } = await loadDashboard();
   const { families, today, totalPending, overdueTotal, settings } = board;
   const owing = families.filter((f) => f.stats.balance > 0);
