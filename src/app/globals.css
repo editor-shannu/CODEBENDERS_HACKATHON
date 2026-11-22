@@ -7,12 +7,6 @@
   --color-brick: #b4432e;
   --color-plaster: #f3ead8;
   --color-slate-mute: #8a97a8;
-  /* Legacy aliases: components still reference the old names; remove once migrated. */
-  --color-ledger: var(--color-plaster);
-  --color-ink: var(--color-dusk-deep);
-  --color-khata: var(--color-brick);
-  --color-mint: var(--color-lamp);
-  --color-turmeric: var(--color-lamp);
   --font-display: var(--font-fraunces), Georgia, serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 }

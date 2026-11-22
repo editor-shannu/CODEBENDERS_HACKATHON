@@ -27,16 +27,16 @@ export default function StudentsPage() {
                 return (
                   <section key={batch}>
                     <Eyebrow className="mb-2">{batch} · {list.length}</Eyebrow>
-                    <Card className="divide-y divide-ink/10 p-0">
+                    <Card className="divide-y divide-dusk-deep/10 p-0">
                       {list.map((s) => (
                         <div key={s.id} className="flex items-center justify-between gap-3 px-4 py-3">
                           <div className="min-w-0">
-                            <Link href={`/families/${s.familyId}`} className="font-display text-xl hover:text-khata">{s.name}</Link>
-                            <p className="truncate font-mono text-[11px] text-ink/60">{s.family.parentName} · due on the {s.dueDay}</p>
+                            <Link href={`/families/${s.familyId}`} className="font-display text-xl hover:text-brick">{s.name}</Link>
+                            <p className="truncate font-mono text-[11px] text-dusk-deep/60">{s.family.parentName} · due on the {s.dueDay}</p>
                           </div>
                           <div className="flex items-center gap-3">
                             <MoneyText amount={s.monthlyFee} className="text-sm" />
-                            <Link href={`/students/${s.id}/edit`} className="font-mono text-[11px] uppercase tracking-widest text-ink/60 hover:text-khata">Edit</Link>
+                            <Link href={`/students/${s.id}/edit`} className="font-mono text-[11px] uppercase tracking-widest text-dusk-deep/60 hover:text-brick">Edit</Link>
                           </div>
                         </div>
                       ))}

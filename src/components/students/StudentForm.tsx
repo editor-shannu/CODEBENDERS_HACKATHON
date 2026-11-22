@@ -31,7 +31,7 @@ export function StudentForm({ families, student, defaultFamilyId }: { families: 
     });
 
   return (
-    <div className="ruled-paper max-w-xl space-y-4 border border-ink/15 p-5 text-ink">
+    <div className="ruled-paper max-w-xl space-y-4 border border-dusk-deep/15 p-5 text-dusk-deep">
       <div>
         <label className={labelClass} htmlFor="name">Student name</label>
         <input id="name" className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Sai Kiran" />
@@ -53,7 +53,7 @@ export function StudentForm({ families, student, defaultFamilyId }: { families: 
         </div>
       </div>
       {!student && (
-        <div className="space-y-3 border-t border-ink/15 pt-4">
+        <div className="space-y-3 border-t border-dusk-deep/15 pt-4">
           <div>
             <label className={labelClass} htmlFor="fam">Family</label>
             <select id="fam" className={inputClass} value={familyId} onChange={(e) => setFamilyId(e.target.value)}>
@@ -77,15 +77,15 @@ export function StudentForm({ families, student, defaultFamilyId }: { families: 
               </div>
             </div>
           )}
-          {familyId && <p className="font-mono text-[11px] text-ink/60">Second and later children get 10% sibling discount.</p>}
+          {familyId && <p className="font-mono text-[11px] text-dusk-deep/60">Second and later children get 10% sibling discount.</p>}
         </div>
       )}
-      {error && <p className="font-mono text-sm text-khata">{error}</p>}
+      {error && <p className="font-mono text-sm text-brick">{error}</p>}
       <div className="flex flex-wrap gap-2">
         <Button onClick={submit} disabled={pending}>{pending ? "Saving…" : student ? "Save changes" : "Add student"}</Button>
         {student && (
           <Button
-            variant={student.active ? "danger" : "mint"}
+            variant={student.active ? "danger" : "lamp"}
             disabled={pending}
             onClick={() => start(async () => { await setStudentActive(student.id, !student.active); router.refresh(); })}
           >
