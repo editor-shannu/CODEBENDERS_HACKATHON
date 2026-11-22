@@ -65,8 +65,8 @@ If `DATABASE_URL` is missing or wrong, the app shows a setup screen explaining w
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | Postgres connection string |
 | `LLM_API_KEY` | No | For the Munshi AI agent (any OpenAI-compatible endpoint) |
-| `LLM_BASE_URL` | No | Defaults to Gemini's OpenAI-compatible endpoint |
-| `LLM_MODEL` | No | Defaults to `gemini-2.5-flash` |
+| `LLM_BASE_URL` | No | Defaults to Groq (`https://api.groq.com/openai/v1`) |
+| `LLM_MODEL` | No | Defaults to `openai/gpt-oss-120b` |
 
 ## Project structure
 
@@ -127,7 +127,7 @@ textures re-encoded to WebP):
 ### Setup in four steps
 
 1. **Database**: create a free Postgres on [Neon](https://neon.tech) and copy the pooled connection string (ends in `?sslmode=require`) into `DATABASE_URL` in `.env` (locally) or in Vercel's Environment Variables.
-2. **AI (optional)**: set `LLM_API_KEY` for any OpenAI-compatible endpoint. Gemini is the default (`LLM_BASE_URL` = Gemini's OpenAI endpoint, `LLM_MODEL` = `gemini-2.5-flash`). Without a key every Munshi feature runs on offline rules.
+2. **AI (optional)**: set `LLM_API_KEY` for any OpenAI-compatible endpoint. Groq is the default (`LLM_BASE_URL` = `https://api.groq.com/openai/v1`, `LLM_MODEL` = `openai/gpt-oss-120b`). Without a key every Munshi feature runs on offline rules.
 3. **Migrate and seed**: `npm run db:push` creates the tables, `npm run db:seed` loads Lakshmi Teaching Point dated from today (the app also seeds itself on first visit, and Settings has a one-tap demo reset).
 4. **Run**: `npm run dev`. There is no login: the demo opens straight on the tutor's dashboard, and parents open their own pay link.
 

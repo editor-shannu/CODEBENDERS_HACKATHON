@@ -76,7 +76,7 @@ export function parseReplyRules(text: string, today: Date, balance: number): Rea
 }
 
 /* ------------------------------------------------------------------ */
-/* LLM plumbing (any OpenAI-compatible endpoint, Gemini by default)    */
+/* LLM plumbing (any OpenAI-compatible endpoint, Groq by default)    */
 /* ------------------------------------------------------------------ */
 
 export const llmEnabled = () => Boolean(process.env.LLM_API_KEY);
@@ -85,12 +85,12 @@ type Msg = { role: "system" | "user" | "assistant" | "tool"; content: string | n
 type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
 
 async function chat(messages: Msg[], tools?: unknown[], json = false): Promise<{ content: string | null; tool_calls?: ToolCall[] }> {
-  const base = process.env.LLM_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai";
+  const base = process.env.LLM_BASE_URL || "https://api.groq.com/openai/v1";
   const res = await fetch(`${base.replace(/\/$/, "")}/chat/completions`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${process.env.LLM_API_KEY}` },
     body: JSON.stringify({
-      model: process.env.LLM_MODEL || "gemini-2.5-flash",
+      model: process.env.LLM_MODEL || "openai/gpt-oss-120b",
       messages,
       ...(tools ? { tools, tool_choice: "auto" } : {}),
       ...(json ? { response_format: { type: "json_object" } } : {}),
@@ -436,7 +436,8 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
         }
         continue;
       }
-      let answer = msg.content?.trim() || "I couldn't work that out.";
+      // Plain text only: the chat bubble does not render markdown.
+      let answer = (msg.content ?? "").replace(/\*\*|__|`/g, "").replace(/^#+\s*/gm, "").trim() || "I couldn't work that out.";
       // Guardrails: rupee amounts must come from tool results; threats or shaming are never shown.
       const checked = checkAmounts(answer, numbersIn(results));
       if (checked !== answer) trace.push({ kind: "think", text: "Guardrail: dropped an amount that no tool returned." });
