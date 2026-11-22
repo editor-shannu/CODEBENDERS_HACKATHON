@@ -33,6 +33,10 @@
   --color-lamp: #f2b01e;
   --color-slate-mute: #a9b0c4;
 }
+[class*="bg-dusk-deep"]:not([class*="bg-dusk-deep/5"]):not([class*="bg-dusk-deep/10"]),
+.board {
+  --color-brick: #ff7b5f;
+}
 
 /* Paper cards keep paper whatever plaster means in context. */
 .bg-plaster { background-color: var(--color-paper); }
