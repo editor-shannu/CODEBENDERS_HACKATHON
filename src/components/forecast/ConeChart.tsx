@@ -37,7 +37,7 @@ export function ConeChart({
         <ComposedChart data={data} margin={mini ? { top: 4, right: 0, left: 0, bottom: 0 } : { top: 10, right: 8, left: 0, bottom: 0 }}>
           {!mini && <CartesianGrid stroke="#1b2444" strokeOpacity={0.08} vertical={false} />}
           {!mini && (
-            <XAxis dataKey="date" tickFormatter={fmtDay} tick={{ fontFamily: "var(--font-mono)", fontSize: 11, fill: "#1b2444" }} interval={13} tickLine={false} axisLine={{ stroke: "#1b2444", strokeOpacity: 0.3 }} />
+            <XAxis dataKey="date" tickFormatter={fmtDay} tick={{ fontFamily: "var(--font-mono)", fontSize: 11, fill: "#1b2444" }} interval={points.length > 45 ? 13 : 6} tickLine={false} axisLine={{ stroke: "#1b2444", strokeOpacity: 0.3 }} />
           )}
           {!mini && (
             <YAxis tickFormatter={(v: number) => formatINRShort(v)} tick={{ fontFamily: "var(--font-mono)", fontSize: 11, fill: "#1b2444" }} width={56} tickLine={false} axisLine={false} />

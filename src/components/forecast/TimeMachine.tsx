@@ -14,6 +14,7 @@ export function TimeMachine({ input, month }: { input: ForecastInput; month: str
   const [lose, setLose] = useState(0);
   const [raise, setRaise] = useState(0);
   const [add, setAdd] = useState(0);
+  const [horizon, setHorizon] = useState<30 | 60 | 90>(90);
 
   const base = useMemo(() => runForecast(input), [input]);
   const whatIf: WhatIf = useMemo(
@@ -27,7 +28,10 @@ export function TimeMachine({ input, month }: { input: ForecastInput; month: str
   );
   const changed = delay || lose || raise || add;
   const sim = useMemo(() => (changed ? runForecast(input, whatIf) : base), [changed, input, whatIf, base]);
-  const end = sim.points[sim.points.length - 1];
+  // Slice the same 90-day simulation to the chosen horizon.
+  const pts = sim.points.filter((p) => p.day <= horizon);
+  const ghostPts = base.points.filter((p) => p.day <= horizon);
+  const end = pts[pts.length - 1];
 
   const slider = (label: string, value: number, set: (n: number) => void, min: number, max: number, step: number, fmt: (n: number) => string) => (
     <div>
@@ -50,14 +54,20 @@ export function TimeMachine({ input, month }: { input: ForecastInput; month: str
           <p className="mt-1 font-mono text-xs opacity-80">days until the likely balance goes negative</p>
         </div>
         <div className="border border-plaster/20 p-4">
-          <p className="font-mono text-[11px] uppercase tracking-[0.14em] opacity-70">In 90 days</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em] opacity-70">In {horizon} days</p>
           <p className="big-number mt-1 text-4xl">{formatINR(end.p50)}</p>
           <p className="mt-1 font-mono text-xs opacity-80">likely · range {formatINR(end.p10)} to {formatINR(end.p90)}</p>
         </div>
       </div>
 
+      <div className="flex gap-2" role="group" aria-label="Forecast horizon">
+        {([30, 60, 90] as const).map((h) => (
+          <button key={h} type="button" aria-pressed={horizon === h} onClick={() => setHorizon(h)} className={`min-h-10 min-w-14 border px-3 font-mono text-[11px] uppercase tracking-widest ${horizon === h ? "border-lamp bg-lamp text-dusk-deep" : "border-plaster/25"}`}>{h}d</button>
+        ))}
+      </div>
+
       <div className="ruled-paper border border-dusk-deep/15 p-3 text-dusk-deep">
-        <ConeChart points={sim.points} ghost={changed ? base.points : undefined} rentDate={sim.rent?.date} keyDates={input.keyDates} height={300} />
+        <ConeChart points={pts} ghost={changed ? ghostPts : undefined} rentDate={sim.rent?.date} keyDates={input.keyDates} height={300} />
         <p className="mt-1 font-mono text-[11px] text-dusk-deep/60">500 simulated futures from each family&apos;s real payment history. Band = 10th to 90th percentile.{changed ? " Faint band = before your changes." : ""}</p>
       </div>
 

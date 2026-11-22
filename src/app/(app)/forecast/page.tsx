@@ -14,7 +14,7 @@ export default function ForecastPage() {
         const input = buildForecastInput(board);
         return (
           <div>
-            <PageHeader title="Forecast" kicker="Cash cone · next 90 days" />
+            <PageHeader title="Forecast" kicker="Cash cone · next 30, 60 or 90 days" />
             <TimeMachine input={input} month={monthKey(addMonths(monthStart(board.today), 1))} />
           </div>
         );
