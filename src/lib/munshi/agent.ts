@@ -175,6 +175,8 @@ export type Ctx = {
   /** The tutor typed this as an instruction in the Munshi chat: their own words are the approval. */
   direct?: boolean;
   question?: string;
+  /** Recent chat turns, so Munshi remembers the conversation ("remind him", "and her?"). */
+  history?: { who: "you" | "munshi"; text: string }[];
 };
 
 type ToolOut = { result: unknown; chart?: ChartData; action?: { id?: string; title: string; status: string }; links?: ChatLink[] };
@@ -421,7 +423,8 @@ async function rulesAnswer(q: string, ctx: Ctx): Promise<AskResult> {
     if (r.links) links.push(...r.links);
     return r.result as never;
   };
-  const named = ctx.families.find((f) => s.includes(f.parentName.split(" ")[0].toLowerCase()) || f.students.some((k) => s.includes(` ${k.name.split(" ")[0].toLowerCase()}`)));
+  const lastNamed = /\b(him|her|them|that family|same|again)\b/.test(s) ? [...(ctx.history ?? [])].reverse().map((h) => ctx.families.find((f) => h.text.includes(f.parentName))).find(Boolean) : undefined;
+  const named = lastNamed ?? ctx.families.find((f) => s.includes(f.parentName.split(" ")[0].toLowerCase()) || f.students.some((k) => s.includes(` ${k.name.split(" ")[0].toLowerCase()}`)));
   const amount = num(s, /(?:₹|rs\.?\s*|inr\s*)([\d,]{2,})/) || num(s, /\b([\d,]{3,})\b/);
   const when = () => parseReplyRules(q, ctx.today, named?.stats.balance ?? 0).promisedDate;
   const tone = /final|last/.test(s) ? "FINAL" : /firm|strict/.test(s) ? "FIRM" : /gentle|soft|polite/.test(s) ? "GENTLE" : undefined;
@@ -542,7 +545,8 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
   const byTool: Record<string, unknown> = {};
   const deadline = Date.now() + 15_000; // each model call gets 5 s; the whole loop at most 15 s, then the offline rules
   const messages: Msg[] = [
-    { role: "system", content: munshiSystemPrompt(ctx) },
+    { role: "system", content: munshiSystemPrompt(ctx) + "\nYou are the tutor's personal assistant: warm, brief, proactive. Reply to small talk naturally, use the conversation so far to resolve 'him', 'her' or 'that family', act with tools when asked to do something on the dashboard, and end with one helpful next step." },
+    ...(ctx.history ?? []).map((h) => ({ role: (h.who === "you" ? "user" : "assistant") as "user" | "assistant", content: h.text })),
     { role: "user", content: question },
   ];
   try {

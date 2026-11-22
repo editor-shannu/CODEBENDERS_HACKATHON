@@ -34,6 +34,20 @@ export function MunshiChat() {
   const end = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
+  // History: the conversation is kept on this device and restored on every screen.
+  const loaded = useRef(false);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("baaki:munshiHistory") ?? "[]") as Line[];
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (Array.isArray(saved) && saved.length) setLines(saved.slice(-60));
+    } catch {}
+    loaded.current = true;
+  }, []);
+  useEffect(() => {
+    if (loaded.current) localStorage.setItem("baaki:munshiHistory", JSON.stringify(lines.slice(-60).map((l) => ({ ...l, actions: l.actions?.map((a) => ({ ...a, id: undefined })) }))));
+  }, [lines]);
+
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "smooth" });
   }, [lines, pending]);
@@ -57,7 +71,7 @@ export function MunshiChat() {
         return;
       }
       try {
-        const r = await askMunshiAction(question, { direct: true });
+        const r = await askMunshiAction(question, { direct: true, history: lines.slice(-8).map((l) => ({ who: l.who, text: l.text.slice(0, 400) })) });
         if (!r.ok) {
           setLines((l) => [...l, { who: "munshi", text: r.error }]);
           return;
@@ -115,7 +129,7 @@ export function MunshiChat() {
           <div className="mb-2 max-h-[60dvh] overflow-y-auto border border-dusk-deep/30 bg-plaster p-3 text-dusk-deep shadow-none" role="log" aria-live="polite">
             <div className="mb-2 flex items-center justify-between">
               <p className="font-display text-xl">Munshi {mode && <span className="ml-1 align-middle font-mono text-[10px] uppercase tracking-wider text-dusk-deep/60">{mode === "RULES" ? "offline rules" : "online"}</span>}</p>
-              <button type="button" aria-label="Close chat" onClick={() => setOpen(false)} className="min-h-9 min-w-9"><X className="mx-auto size-5" /></button>
+              <span className="flex items-center gap-2">{lines.length > 0 && <button type="button" onClick={() => { setLines([]); localStorage.removeItem("baaki:munshiHistory"); }} className="font-mono text-[10px] uppercase tracking-wider text-dusk-deep/60 underline">Clear history</button>}<button type="button" aria-label="Close chat" onClick={() => setOpen(false)} className="min-h-9 min-w-9"><X className="mx-auto size-5" /></button></span>
             </div>
             {!lines.length && (
               <div>

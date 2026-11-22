@@ -326,7 +326,7 @@ export async function readReplyAction(familyId: string, text: string) {
   return { ok: true as const, result: r, balance, scheduled };
 }
 
-export async function askMunshiAction(question: string, opts: { direct?: boolean } = {}) {
+export async function askMunshiAction(question: string, opts: { direct?: boolean; history?: { who: "you" | "munshi"; text: string }[] } = {}) {
   if (!question.trim()) return { ok: false as const, error: "Ask a question" };
   const { askMunshi } = await import("@/lib/munshi/agent");
   const { loadDashboard } = await import("@/lib/board-view");
@@ -344,6 +344,7 @@ export async function askMunshiAction(question: string, opts: { direct?: boolean
     origin: await getOrigin(),
     direct: !!opts.direct,
     question: question.trim().slice(0, 500),
+    history: (opts.history ?? []).slice(-8).map((h) => ({ who: h.who === "you" ? ("you" as const) : ("munshi" as const), text: String(h.text).slice(0, 400) })),
   });
   if (r.actions?.length || r.links?.length) refreshAll();
   return { ok: true as const, ...r };
