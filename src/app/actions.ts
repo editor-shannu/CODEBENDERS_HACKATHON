@@ -378,3 +378,17 @@ export async function dismissRentPlan(): Promise<ActionResult> {
   refreshAll();
   return { ok: true };
 }
+
+/* ---------- Paste & Match ---------- */
+export async function matchUpiSmsAction(text: string) {
+  if (!text.trim()) return { ok: false as const, error: "Paste the SMS first" };
+  const { parseUpiSms, matchInvoices } = await import("@/lib/upi-sms");
+  const today = todayIST();
+  const parsed = parseUpiSms(text.slice(0, 600), today);
+  const invoices = await db.invoice.findMany({ where: { status: { in: ["SENT", "PARTIAL"] } }, include: { payments: true, family: { include: { students: true } } } });
+  const open = invoices
+    .map((i) => ({ invoiceId: i.id, familyId: i.familyId, parent: i.family.parentName, kids: i.family.students.map((s) => s.name), balance: i.amount - sumPaid(i.payments), number: i.number, dueDate: toKey(i.dueDate) }))
+    .filter((o) => o.balance > 0);
+  const already = parsed.utr ? await db.payment.findFirst({ where: { reference: parsed.utr } }) : null;
+  return { ok: true as const, parsed, matches: matchInvoices(parsed, open), duplicate: !!already, today: toKey(today) };
+}

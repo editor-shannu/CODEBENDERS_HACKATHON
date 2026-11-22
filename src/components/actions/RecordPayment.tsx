@@ -17,6 +17,7 @@ export function RecordPaymentButton({
   className = "",
   familyId,
   onRecorded,
+  defaults,
 }: {
   invoiceId?: string;
   balance: number;
@@ -28,6 +29,8 @@ export function RecordPaymentButton({
   /** When set, the payment settles the family's oldest invoices first. */
   familyId?: string;
   onRecorded?: (status: "PAID" | "PARTIAL") => void;
+  /** Prefill from Paste & Match or Voice Khata. */
+  defaults?: { amount?: number; mode?: "CASH" | "UPI"; reference?: string; date?: string };
 }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(String(balance));
@@ -58,7 +61,13 @@ export function RecordPaymentButton({
 
   return (
     <>
-      <Button variant={variant} className={className} onClick={() => { setAmount(String(balance)); setOpen(true); }}>
+      <Button variant={variant} className={className} onClick={() => {
+          setAmount(String(defaults?.amount && defaults.amount <= balance ? defaults.amount : balance));
+          if (defaults?.mode) setMode(defaults.mode);
+          if (defaults?.reference) setReference(defaults.reference);
+          if (defaults?.date && defaults.date <= today) setDate(defaults.date);
+          setOpen(true);
+        }}>
         {label}
       </Button>
       <Sheet open={open} onClose={() => setOpen(false)} title={title}>
