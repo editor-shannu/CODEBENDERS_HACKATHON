@@ -58,7 +58,7 @@ function House({ f, i, data, control, tex }: { f: LandingFamily; i: number; data
     const wall = new THREE.MeshStandardMaterial({ map: tex.plaster, normalMap: tex.plasterN, color: paint, roughness: 0.95 });
     const sign = signTexture(
       [
-        { text: shop.te, font: "600 52px 'Noto Sans Telugu', 'Nirmala UI', 'Kohinoor Telugu', Gautami, sans-serif", y: 0.36 },
+        { text: shop.te, font: "600 54px TELUGU", y: 0.36 },
         { text: shop.en.toUpperCase(), font: "700 44px Georgia, serif", y: 0.74 },
       ],
       shop.bg,

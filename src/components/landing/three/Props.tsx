@@ -3,7 +3,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { archedWall, minaretProfile } from "./oldcity";
+import { archedWall, FACADE, minaretProfile } from "./oldcity";
 import type { StageControl } from "../LaneStage";
 import { nightAt } from "./Rig";
 import { HOUSE_GAP } from "./Lane";
@@ -83,24 +83,30 @@ export function CityBlocks() {
   const data = useMemo(() => {
     const rnd = mulberry(7);
     const out: { x: number; z: number; w: number; h: number; d: number; c: THREE.Color }[] = [];
-    const tints = ["#d9c7b0", "#cbb79a", "#e3d2b5", "#b7a58c", "#c9c2b2", "#d8bfa0"];
+    const tints = [...FACADE, "#d9c7b0", "#cbb79a", "#e3d2b5"];
     while (out.length < count) {
       const x = (rnd() - 0.5) * 260;
       const z = -150 + rnd() * 170;
       if (Math.abs(z + 2) < 11 && Math.abs(x) < 50) continue; // keep the lane clear
+      if (z > -16 && Math.abs(x) < 70) continue; // and the camera's foreground
       if (Math.hypot(x - 26, z + 105) < 30) continue; // and Charminar's square
-      const h = 3 + rnd() * rnd() * 14;
+      const h = 4 + Math.floor(rnd() * 3) * 2.6 + rnd() * rnd() * 4; // two to four storeys, the odd taller block
       out.push({ x, z, w: 3 + rnd() * 5, h, d: 3 + rnd() * 5, c: new THREE.Color(tints[Math.floor(rnd() * tints.length)]) });
     }
     return out;
   }, []);
+  const tanks = useRef<THREE.InstancedMesh>(null);
   useLayoutEffect(() => {
     const m = new THREE.Matrix4();
     data.forEach((b, i) => {
       m.compose(new THREE.Vector3(b.x, b.h / 2, b.z), new THREE.Quaternion(), new THREE.Vector3(b.w, b.h, b.d));
       ref.current?.setMatrixAt(i, m);
       ref.current?.setColorAt(i, b.c);
+      // the black plastic water tank on nearly every terrace
+      m.compose(new THREE.Vector3(b.x + b.w * 0.25, b.h + 0.5, b.z - b.d * 0.2), new THREE.Quaternion(), new THREE.Vector3(1, 1, 1));
+      tanks.current?.setMatrixAt(i, m);
     });
+    if (tanks.current) tanks.current.instanceMatrix.needsUpdate = true;
     if (ref.current) {
       ref.current.instanceMatrix.needsUpdate = true;
       if (ref.current.instanceColor) ref.current.instanceColor.needsUpdate = true;
@@ -115,6 +121,10 @@ export function CityBlocks() {
       <instancedMesh ref={ref} args={[undefined, undefined, count]}>
         <boxGeometry />
         <meshStandardMaterial roughness={1} />
+      </instancedMesh>
+      <instancedMesh ref={tanks} args={[undefined, undefined, count]}>
+        <cylinderGeometry args={[0.55, 0.55, 1, 10]} />
+        <meshStandardMaterial color="#141518" roughness={0.6} />
       </instancedMesh>
     </>
   );

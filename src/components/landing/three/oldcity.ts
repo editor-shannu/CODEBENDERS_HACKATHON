@@ -59,7 +59,33 @@ export function signTexture(lines: { text: string; font: string; y: number }[], 
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  const telugu = getComputedStyle(document.documentElement).getPropertyValue("--font-telugu").split(",")[0].trim() || "'Noto Sans Telugu'";
+  // only the web font goes to fonts.load (its local() fallback face makes the promise reject); system Telugu fonts stay as fallbacks for painting
+  const family = `${telugu}, 'Noto Sans Telugu', 'Nirmala UI', 'Kohinoor Telugu', Gautami, sans-serif`;
+  const resolved = lines.map((l) => ({ ...l, font: l.font.replace("TELUGU", family) }));
+  const toLoad = lines.filter((l) => l.font.includes("TELUGU")).map((l) => ({ font: l.font.replace("TELUGU", telugu), text: l.text }));
+  const paint = () => drawSign(c, resolved, bg, fg);
+  paint();
+  // canvas text needs the web font loaded first; repaint once it is
+  if (document.fonts) {
+    Promise.all(toLoad.map((l) => document.fonts.load(l.font, l.text)))
+      .then(() => {
+        paint();
+        t.needsUpdate = true;
+      })
+      .catch(() => {});
+  }
+  return t;
+}
+
+function drawSign(c: HTMLCanvasElement, lines: { text: string; font: string; y: number }[], bg: string, fg: string) {
+  const w = c.width;
+  const h = c.height;
   const g = c.getContext("2d")!;
+  g.globalAlpha = 1;
   g.fillStyle = bg;
   g.fillRect(0, 0, w, h);
   g.strokeStyle = fg;
@@ -76,10 +102,6 @@ export function signTexture(lines: { text: string; font: string; y: number }[], 
   g.globalAlpha = 0.12;
   g.fillStyle = "#ffffff";
   for (let i = 0; i < 120; i++) g.fillRect((i * 97) % w, (i * 53) % h, 2 + (i % 3), 1 + (i % 2));
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
-  return t;
 }
 
 /** Rolling shutter: corrugated stripes. */

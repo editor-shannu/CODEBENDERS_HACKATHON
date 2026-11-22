@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
-import { Courier_Prime, Hind, Rozha_One } from "next/font/google";
+import { Courier_Prime, Hind, Hind_Guntur, Rozha_One } from "next/font/google";
 import BottomNav from "@/components/nav/BottomNav";
 import { Main, TutorOnly } from "@/components/nav/TutorOnly";
 import { getSettings } from "@/lib/data";
@@ -12,6 +12,8 @@ import "./globals.css";
 const rozha = Rozha_One({ weight: "400", variable: "--font-rozha", subsets: ["latin"], display: "swap" });
 const courier = Courier_Prime({ weight: ["400", "700"], variable: "--font-courier", subsets: ["latin"], display: "swap" });
 const hind = Hind({ weight: ["400", "500", "600"], variable: "--font-hind", subsets: ["latin"], display: "swap" });
+// Hind Guntur: Hind's Telugu sibling, for the shop signboards on the landing lane.
+const telugu = Hind_Guntur({ weight: "600", variable: "--font-telugu", subsets: ["telugu"], display: "swap", preload: false });
 
 export const metadata: Metadata = {
   title: "Baaki",
@@ -27,7 +29,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const settings = await getSettings();
   const today = formatDate(todayIST());
   return (
-    <html lang="en" className={`${rozha.variable} ${courier.variable} ${hind.variable}`}>
+    <html lang="en" className={`${rozha.variable} ${courier.variable} ${hind.variable} ${telugu.variable}`}>
       <body className="flex min-h-dvh flex-col">
         <TutorOnly>
         <header className="board border-b-4 border-brick bg-dusk-deep px-4 py-3 text-plaster">
