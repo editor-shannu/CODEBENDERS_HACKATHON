@@ -91,12 +91,13 @@ export function whatIfSentence(r: { scenarioLabel?: string | null; dropBy: strin
   return `${lead} likely balance in 90 days ${move}.${risk}`;
 }
 
-export const llmEnabled = () => Boolean(process.env.LLM_API_KEY);
+/** AI only with a key and when MUNSHI_FORCE_RULES is not "1"; otherwise every answer comes from the offline rules. */
+export const llmEnabled = () => Boolean(process.env.LLM_API_KEY) && process.env.MUNSHI_FORCE_RULES !== "1";
 
 export type Msg = { role: "system" | "user" | "assistant" | "tool"; content: string | null; tool_calls?: ToolCall[]; tool_call_id?: string };
 type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
 
-export async function chat(messages: Msg[], tools?: unknown[], json = false): Promise<{ content: string | null; tool_calls?: ToolCall[] }> {
+export async function chat(messages: Msg[], tools?: unknown[], json = false, timeoutMs = 20_000): Promise<{ content: string | null; tool_calls?: ToolCall[] }> {
   const base = process.env.LLM_BASE_URL || "https://api.groq.com/openai/v1";
   const res = await fetch(`${base.replace(/\/$/, "")}/chat/completions`, {
     method: "POST",
@@ -108,7 +109,7 @@ export async function chat(messages: Msg[], tools?: unknown[], json = false): Pr
       ...(json ? { response_format: { type: "json_object" } } : {}),
       temperature: 0.2,
     }),
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) throw new Error(`LLM ${res.status}`);
   const data = await res.json();
@@ -147,7 +148,7 @@ export type ChartData =
   | { kind: "cash"; title: string; points: { date: string; before: number; after: number }[] }
   | { kind: "owed"; title: string; bars: { name: string; owed: number }[] };
 export type ChatLink = { label: string; url: string; kind: "whatsapp" | "page" };
-export type AskResult = { answer: string; trace: TraceStep[]; source: "AI" | "RULES"; chart?: ChartData; actions?: { title: string; status: string }[]; links?: ChatLink[] };
+export type AskResult = { answer: string; trace: TraceStep[]; source: "AI" | "RULES"; chart?: ChartData; actions?: { id?: string; title: string; status: string }[]; links?: ChatLink[] };
 
 export type Ctx = {
   families: FamilyWithStats[];
@@ -164,9 +165,8 @@ export type Ctx = {
   question?: string;
 };
 
-type ToolOut = { result: unknown; chart?: ChartData; action?: { title: string; status: string }; links?: ChatLink[] };
+type ToolOut = { result: unknown; chart?: ChartData; action?: { id?: string; title: string; status: string }; links?: ChatLink[] };
 
-const SAID_PAID = /\b(paid|pay chesaru|received|got|gave|collected|ichharu|icharu|ichadu|kattaru|kattadu|diya|de diya|jama|credited|cash|upi|gpay|phonepe)\b/i;
 
 function findFamily(ctx: Ctx, name: unknown) {
   const q = String(name ?? "").toLowerCase().trim();
@@ -181,7 +181,8 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx, so
   const owing = ctx.families.filter((f) => f.stats.balance > 0);
   const write = async (type: WriteType, familyId: string | null, title: string, payload: Record<string, unknown>, reason = "") => {
     // A direct instruction from the tutor runs now. Money only when the tutor's own words said they were paid.
-    const told = ctx.direct && (!MONEY.includes(type) || (type === "PAYMENT" ? SAID_PAID.test(ctx.question ?? "") : /\b(invoice|bill|due)\b/i.test(ctx.question ?? "")));
+    // Payments always wait for the tutor's Approve tap, even in chat.
+    const told = ctx.direct && type !== "PAYMENT" && (!MONEY.includes(type) || /\b(invoice|bill|due)\b/i.test(ctx.question ?? ""));
     if (told) {
       const r = await runNow({ type, familyId, title, payload, reason, source });
       return { id: r.id, status: "done", result: r.result };
@@ -291,7 +292,7 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx, so
       if (!(amount > 0) || amount > f.stats.balance) return { result: { error: `Amount must be between 1 and ${f.stats.balance}, what ${f.parentName} owes` } };
       const mode = String(args.mode ?? "CASH").toUpperCase() === "UPI" ? "UPI" : "CASH";
       const r = await write("PAYMENT", f.id, `Record ${formatINR(amount)} ${mode.toLowerCase()} from ${f.parentName}`, { amount, mode });
-      return { result: { proposal: true, amount, mode, ...r }, action: { title: `Record ${formatINR(amount)} from ${f.parentName}`, status: r.status } };
+      return { result: { proposal: true, amount, mode, balanceNow: f.stats.balance, balanceAfter: f.stats.balance - amount, ...r }, action: { id: r.status === "done" ? undefined : r.id, title: `Record ${formatINR(amount)} ${mode === "UPI" ? "UPI" : "cash"} from ${f.parentName}`, status: r.status } };
     }
     case "record_promise": {
       const f = findFamily(ctx, args.name);
@@ -394,7 +395,7 @@ async function rulesAnswer(q: string, ctx: Ctx): Promise<AskResult> {
   const s = ` ${q.toLowerCase()} `;
   const trace: TraceStep[] = [{ kind: "think", text: "Offline mode: matching the question to a known tool." }];
   let chart: ChartData | undefined;
-  const actions: { title: string; status: string }[] = [];
+  const actions: { id?: string; title: string; status: string }[] = [];
   const links: ChatLink[] = [];
   const call = async (name: string, args: Record<string, unknown> = {}) => {
     trace.push({ kind: "tool", text: `${name}(${JSON.stringify(args)})` });
@@ -427,7 +428,12 @@ async function rulesAnswer(q: string, ctx: Ctx): Promise<AskResult> {
     }
   } else if (lateWords) {
     const r = (await call("remind_all_late", tone ? { tone } : {})) as { drafted: number; families: { parent: string; owes: number; daysLate: number }[] };
-    answer = r.drafted ? `${r.drafted} reminders are ready, each in the family's own language with their pay link. Tap a name to send it on WhatsApp.` : "Nobody is late right now.";
+    const r2 = r as unknown as { families: { parent: string; owes: number; daysLate: number; tone: string }[] };
+    answer = r.drafted ? `${r.drafted} reminders are ready, each in the family's own language with their pay link: ${r2.families.map((x) => `${x.parent} ${formatINR(x.owes)}, ${x.daysLate}d late (${x.tone.toLowerCase()})`).join("; ")}. Tap a name to send it on WhatsApp.` : "Nobody is late right now.";
+  } else if (/owes? (the )?most|biggest (balance|due|dues)|highest (balance|due)|most (pending|money)/.test(s)) {
+    const r = (await call("list_owing_families", { limit: 20 })) as { parent: string; owes: number; daysLate: number }[];
+    const top = [...r].sort((a, b) => b.owes - a.owes);
+    answer = top.length ? `${top[0].parent} owes the most: ${formatINR(top[0].owes)}, ${top[0].daysLate} days late.${top[1] ? ` Next: ${top.slice(1, 3).map((x) => `${x.parent} (${formatINR(x.owes)})`).join(", ")}.` : ""}` : "Nobody owes anything right now.";
   } else if (whoOwes) {
     const r = (await call("remind_all_late", {})) as { drafted: number; families: { parent: string; owes: number; daysLate: number }[] };
     const tot = ctx.totalPending;
@@ -463,7 +469,7 @@ async function rulesAnswer(q: string, ctx: Ctx): Promise<AskResult> {
   } else if (named && /\b(paid|received|got|gave|collected)\b/.test(s)) {
     const mode = /upi|gpay|phonepe|paytm/.test(s) ? "UPI" : "CASH";
     const r = (await call("log_payment", { name: named.parentName, amount: amount || named.stats.balance, mode })) as { amount?: number; status?: string; error?: string };
-    answer = r.amount ? (r.status === "done" ? `Recorded ${formatINR(r.amount)} ${mode === "UPI" ? "UPI" : "cash"} from ${named.parentName}. ${named.parentName.split(" ")[0]} now owes ${formatINR(Math.max(0, named.stats.balance - r.amount))}.` : `Payment of ${formatINR(r.amount)} from ${named.parentName} is ${r.status}. Money actions need your tap.`) : r.error ?? "I couldn't log that.";
+    answer = r.amount ? (r.status === "done" ? `Recorded ${formatINR(r.amount)} ${mode === "UPI" ? "UPI" : "cash"} from ${named.parentName}. ${named.parentName.split(" ")[0]} now owes ${formatINR(Math.max(0, named.stats.balance - r.amount))}.` : `Record ${formatINR(r.amount)} ${mode === "UPI" ? "UPI" : "cash"} from ${named.parentName}? Tap Approve and ${named.parentName.split(" ")[0]} will owe ${formatINR(Math.max(0, named.stats.balance - r.amount))} (now ${formatINR(named.stats.balance)}).`) : r.error ?? "I couldn't log that.";
   } else if (named && /due (date|day)|move .*due|change .*due/.test(s)) {
     const day = num(s, /(\d{1,2})(?:st|nd|rd|th)?\b/);
     const r = (await call("propose_due_date_change", { name: named.parentName, dueDay: day })) as { dueDay?: number; status?: string; error?: string };
@@ -499,17 +505,18 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
   if (!llmEnabled()) return rulesAnswer(question, ctx);
   const trace: TraceStep[] = [];
   let chart: ChartData | undefined;
-  const actions: { title: string; status: string }[] = [];
+  const actions: { id?: string; title: string; status: string }[] = [];
   const links: ChatLink[] = [];
   const results: unknown[] = [];
   const whatIfs: Parameters<typeof whatIfSentence>[0][] = [];
+  const deadline = Date.now() + 5_000; // over 5 s in the model: fall back to the offline rules
   const messages: Msg[] = [
     { role: "system", content: munshiSystemPrompt(ctx) },
     { role: "user", content: question },
   ];
   try {
     for (let i = 0; i < 6; i++) {
-      const msg = await chat(messages, TOOLS);
+      const msg = await chat(messages, TOOLS, false, Math.max(500, deadline - Date.now()));
       if (msg.tool_calls?.length) {
         messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
         for (const tc of msg.tool_calls) {

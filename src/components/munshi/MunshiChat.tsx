@@ -4,11 +4,11 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Mic, Send, X } from "lucide-react";
-import { askMunshiAction } from "@/app/actions";
+import { askMunshiAction, setActionStatus } from "@/app/actions";
 
 type Rec = { lang: string; interimResults: boolean; maxAlternatives: number; start: () => void; stop: () => void; onresult: ((e: { results: { 0: { transcript: string } }[] }) => void) | null; onerror: (() => void) | null; onend: (() => void) | null };
 type ChatLink = { label: string; url: string; kind: "whatsapp" | "page" };
-type Line = { who: "you" | "munshi"; text: string; links?: ChatLink[]; actions?: { title: string; status: string }[]; source?: string };
+type Line = { who: "you" | "munshi"; text: string; links?: ChatLink[]; actions?: { id?: string; title: string; status: string }[]; source?: string };
 
 const CHIPS = ["Who hasn't paid?", "Remind all late families", "Ravi paid 1500 cash", "Add Sita class 8 ₹1500, mother Kavitha", "What if the biggest family pays 15 days late?", "Will I make rent?"];
 const LANGS = [
@@ -57,6 +57,23 @@ export function MunshiChat() {
     });
   };
 
+  const mode = [...lines].reverse().find((l) => l.who === "munshi" && l.source)?.source;
+
+  const approve = (lineIdx: number, id: string, status: "DONE" | "SKIPPED") => {
+    start(async () => {
+      try {
+        const r = await setActionStatus(id, status);
+        setLines((l) => [
+          ...l.map((x, j) => (j === lineIdx ? { ...x, actions: x.actions?.map((a) => (a.id === id ? { ...a, id: undefined, status: status === "DONE" ? "done" : "skipped" } : a)) } : x)),
+          { who: "munshi", text: status === "SKIPPED" ? "Skipped. Nothing was recorded." : r.ok ? (r.message ?? "Done.") : (r.error ?? "That didn't go through.") },
+        ]);
+        router.refresh();
+      } catch {
+        setLines((l) => [...l, { who: "munshi", text: "That didn't go through. Try again in a moment." }]);
+      }
+    });
+  };
+
   const mic = () => {
     const W = window as unknown as { SpeechRecognition?: new () => Rec; webkitSpeechRecognition?: new () => Rec };
     const Ctor = W.SpeechRecognition ?? W.webkitSpeechRecognition;
@@ -84,7 +101,7 @@ export function MunshiChat() {
         {open && (
           <div className="mb-2 max-h-[60dvh] overflow-y-auto border border-dusk-deep/30 bg-plaster p-3 text-dusk-deep shadow-none" role="log" aria-live="polite">
             <div className="mb-2 flex items-center justify-between">
-              <p className="font-display text-xl">Munshi</p>
+              <p className="font-display text-xl">Munshi {mode && <span className="ml-1 align-middle font-mono text-[10px] uppercase tracking-wider text-dusk-deep/60">{mode === "RULES" ? "offline rules" : "online"}</span>}</p>
               <button type="button" aria-label="Close chat" onClick={() => setOpen(false)} className="min-h-9 min-w-9"><X className="mx-auto size-5" /></button>
             </div>
             {!lines.length && (
@@ -104,6 +121,12 @@ export function MunshiChat() {
                   {!!l.actions?.length && (
                     <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-dusk-deep/60">{l.actions.map((a) => `${a.title}: ${a.status}`).join(" · ")}</p>
                   )}
+                  {l.actions?.filter((a) => a.id && a.status !== "done").map((a) => (
+                    <div key={a.id} className="mt-2 flex gap-2">
+                      <button type="button" disabled={pending} onClick={() => approve(i, a.id!, "DONE")} className="min-h-9 border border-dusk-deep bg-dusk-deep px-3 font-mono text-[11px] uppercase tracking-wider text-plaster">Approve</button>
+                      <button type="button" disabled={pending} onClick={() => approve(i, a.id!, "SKIPPED")} className="min-h-9 border border-dusk-deep/40 px-3 font-mono text-[11px] uppercase tracking-wider">Skip</button>
+                    </div>
+                  ))}
                   {!!l.links?.length && (
                     <div className="mt-2 flex flex-wrap gap-2">
                       {l.links.map((k) =>
