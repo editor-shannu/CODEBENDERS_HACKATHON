@@ -16,8 +16,9 @@ export const LOW_RISK: WriteType[] = ["REMIND", "NUDGE", "PROMISE", "FLAG"];
 export const MONEY: WriteType[] = ["PAYMENT", "INVOICE", "DUE_DATE"];
 
 export function canAutoRun(type: string, autonomy: string, payload: Record<string, unknown> = {}): boolean {
+  // Money actions always wait for the tutor, whatever the dial says.
   if (MONEY.includes(type as WriteType)) return false;
-  if (type === "FLAG") return true; // a flag only writes a note
+  // SUGGEST and ASK: everything goes to the approval inbox.
   if (autonomy !== "AUTO") return false;
   if (type === "REMIND") return (payload.tone ?? "GENTLE") === "GENTLE";
   return LOW_RISK.includes(type as WriteType);
@@ -108,4 +109,25 @@ export async function approveAction(id: string) {
   const line = await performAction(a.type, a.familyId, parse(a.payload));
   await db.agentAction.update({ where: { id }, data: { status: "DONE", detail: a.detail ? `${a.detail} · ${line}` : line } });
   return line;
+}
+
+export const AUTONOMY_LABEL: Record<string, string> = {
+  SUGGEST: "Suggest: Munshi only suggests, everything waits in your inbox",
+  ASK: "Ask: Munshi drafts, you approve every action",
+  AUTO: "Auto: gentle reminder drafts, nudges and promises run on their own; money actions still wait for you",
+};
+
+/** In AUTO, gentle brief reminders are drafted and logged on their own, once a day per family. */
+export async function autoRunBrief(items: { key: string; type: string; familyId?: string; title: string; detail: string; reason: string; payload?: Record<string, unknown> }[], today: Date) {
+  const done = await db.agentAction.findMany({ where: { createdAt: { gte: today }, reason: { startsWith: "brief:" } }, select: { reason: true } });
+  const seen = new Set(done.map((a) => a.reason.split(" ")[0]));
+  let n = 0;
+  for (const item of items) {
+    if ((item.type !== "REMIND" && item.type !== "FOLLOW_UP") || (item.payload?.tone ?? "GENTLE") !== "GENTLE") continue;
+    const tag = `brief:${item.key}`;
+    if (seen.has(tag)) continue;
+    await db.agentAction.create({ data: { type: item.type, familyId: item.familyId ?? null, title: `Auto-drafted: ${item.title}`, detail: item.detail, reason: `${tag} ${item.reason}`, payload: JSON.stringify(item.payload ?? {}), status: "APPROVED", source: "RULES" } });
+    n++;
+  }
+  return n;
 }

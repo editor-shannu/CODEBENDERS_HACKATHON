@@ -3,6 +3,7 @@ import { Guard } from "@/components/setup/Guard";
 import { ApproveAllBrief, BriefActions } from "@/components/munshi/BriefActions";
 import { AskMunshi, InboxButtons, PlanControls, PlanStepAction, ReplyReader } from "@/components/munshi/MunshiTools";
 import { loadActivePlan } from "@/lib/munshi/plan";
+import { AUTONOMY_LABEL, autoRunBrief } from "@/lib/munshi/execute";
 import { loadDashboard } from "@/lib/board-view";
 import { buildRentPlan } from "@/lib/munshi/rules";
 import { llmEnabled } from "@/lib/munshi/agent";
@@ -18,6 +19,8 @@ export default function MunshiPage() {
     <Guard>
       {async () => {
         const { board, forecast, brief, payloads } = await loadDashboard();
+        const autonomy = board.settings.autonomy;
+        const autoRan = autonomy === "AUTO" ? await autoRunBrief(brief, board.today) : 0;
         const plan = buildRentPlan({ families: board.families, forecast, bills: board.bills, today: board.today });
         const [inbox, log, active] = await Promise.all([
           db.agentAction.findMany({ where: { status: "PENDING", planId: null }, orderBy: { createdAt: "asc" }, take: 20 }),
@@ -29,7 +32,11 @@ export default function MunshiPage() {
         const famName = new Map(board.families.map((f) => [f.id, f.parentName]));
         return (
           <div className="space-y-6">
-            <PageHeader title="Munshi" kicker={aiOn ? "AI clerk · online" : "Clerk · offline rules"} />
+            <PageHeader title="Munshi" kicker={`${aiOn ? "AI clerk · online" : "Clerk · offline rules"} · ${autonomy.toLowerCase()} mode`} />
+            <p className="font-mono text-[11px] text-plaster/60">
+              Autonomy · {AUTONOMY_LABEL[autonomy] ?? AUTONOMY_LABEL.ASK}
+              {autoRan ? ` · drafted ${autoRan} gentle reminder${autoRan > 1 ? "s" : ""} on its own today` : ""} · change it in Settings
+            </p>
 
             <section>
               <div className="mb-2 flex items-center justify-between gap-3">
