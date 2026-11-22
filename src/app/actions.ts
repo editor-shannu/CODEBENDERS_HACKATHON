@@ -68,6 +68,8 @@ export async function addPromise(input: { familyId: string; promisedDate: string
 
 export async function logReminder(familyId: string, tone: string, language: string): Promise<ActionResult> {
   await db.reminder.create({ data: { familyId, tone, language } });
+  // sending clears any nudge that was due by today
+  await db.reminder.updateMany({ where: { familyId, status: "SCHEDULED", scheduledFor: { lte: todayIST() } }, data: { status: "DONE" } });
   refreshAll();
   return { ok: true };
 }
@@ -293,6 +295,7 @@ export async function setActionStatus(id: string, status: "APPROVED" | "DONE" | 
 export async function readReplyAction(familyId: string, text: string) {
   const { parseReply } = await import("@/lib/munshi/agent");
   const { familyStats } = await import("@/lib/family-stats");
+  const { loadDashboard } = await import("@/lib/board-view");
   const f = await db.family.findUnique({
     where: { id: familyId },
     include: { students: true, invoices: { include: { payments: true } }, promises: true, reminders: { where: { status: "SENT" } } },
@@ -303,8 +306,25 @@ export async function readReplyAction(familyId: string, text: string) {
   const r = await parseReply(text.trim(), today, balance, f.parentName);
   await learnFromReply(familyId, text.trim(), r.promisedDate);
   await db.agentAction.create({ data: { type: "NOTE", familyId, title: `Read reply from ${f.parentName}`, detail: text.slice(0, 200), reason: r.summary, status: "DONE", source: r.source } });
+
+  let scheduled: { promiseDate: string; amount: number; followUpDate: string; riskBefore: number | null; riskAfter: number | null } | null = null;
+  if (r.promisedDate && balance > 0) {
+    const before = (await loadDashboard()).forecast.rent?.risk ?? null;
+    const amount = Math.min(balance, Math.max(1, Math.round(r.amount ?? balance)));
+    const promisedDate = fromKey(r.promisedDate);
+    // one open promise per family: a new reply replaces the old date
+    const open = await db.payPromise.findFirst({ where: { familyId, kept: null }, orderBy: { createdAt: "desc" } });
+    if (open) await db.payPromise.update({ where: { id: open.id }, data: { promisedDate, amount, note: text.slice(0, 200), source: "MUNSHI" } });
+    else await db.payPromise.create({ data: { familyId, promisedDate, amount, note: text.slice(0, 200), source: "MUNSHI" } });
+    const followUp = addDays(promisedDate, 1);
+    await db.reminder.deleteMany({ where: { familyId, status: "SCHEDULED", note: { startsWith: "promise-follow-up" } } });
+    await db.reminder.create({ data: { familyId, tone: "GENTLE", language: f.language, status: "SCHEDULED", scheduledFor: followUp, note: `promise-follow-up ${r.promisedDate}` } });
+    await db.agentAction.create({ data: { type: "PROMISE", familyId, title: `${f.parentName} promised ${amount} on ${r.promisedDate}; follow-up nudge on ${toKey(followUp)}`, reason: r.summary, status: "DONE", source: r.source } });
+    const after = (await loadDashboard()).forecast.rent?.risk ?? null;
+    scheduled = { promiseDate: r.promisedDate, amount, followUpDate: toKey(followUp), riskBefore: before, riskAfter: after };
+  }
   refreshAll();
-  return { ok: true as const, result: r, balance };
+  return { ok: true as const, result: r, balance, scheduled };
 }
 
 export async function askMunshiAction(question: string) {

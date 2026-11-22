@@ -25,9 +25,26 @@ export function memoryOf(f: { memory: string }): Record<string, string> {
 
 const toneWord = (t: string) => t.toLowerCase();
 
-export function buildBrief(opts: { families: FamilyWithStats[]; today: Date; forecast: ForecastResult; pendingClaims: number }): BriefItem[] {
+export function buildBrief(opts: { families: FamilyWithStats[]; today: Date; forecast: ForecastResult; pendingClaims: number; nudges?: { familyId: string; scheduledFor: Date; tone: string; note: string }[] }): BriefItem[] {
   const { families, today, forecast } = opts;
   const items: BriefItem[] = [];
+
+  for (const n of opts.nudges ?? []) {
+    const f = families.find((x) => x.id === n.familyId);
+    if (!f || f.stats.balance <= 0 || n.scheduledFor > today) continue;
+    if (items.some((i) => i.key === `nudge-${f.id}`)) continue;
+    const promise = n.note.startsWith("promise-follow-up");
+    items.push({
+      key: `nudge-${f.id}`,
+      type: "FOLLOW_UP",
+      familyId: f.id,
+      title: promise ? `${f.parentName}'s promised date has passed: follow up` : `Scheduled nudge for ${f.parentName} is due`,
+      detail: `Gentle reminder for ${formatINR(f.stats.balance)}.`,
+      reason: promise ? `Munshi scheduled this the day after the promised ${formatDate(fromKey(n.note.split(" ")[1] ?? ""), { year: false })}.` : `You or Munshi scheduled this for ${formatDate(n.scheduledFor, { year: false })}.`,
+      priority: 75,
+      payload: { tone: n.tone || "GENTLE" },
+    });
+  }
 
   if (opts.pendingClaims > 0)
     items.push({

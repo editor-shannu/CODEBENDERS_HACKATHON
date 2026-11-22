@@ -66,12 +66,15 @@ export function InboxButtons({ id }: { id: string }) {
   );
 }
 
+const fmtKey = (k: string) => new Intl.DateTimeFormat("en-IN", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" }).format(new Date(`${k}T00:00:00Z`));
+
 const SAMPLES = ["sir next week pakka istanu", "kal de dunga sir", "salary vachaka 5th ki pay chestha", "Will pay 1500 on Friday madam"];
 
 export function ReplyReader({ families }: { families: { id: string; parentName: string }[] }) {
   const [familyId, setFamilyId] = useState(families[0]?.id ?? "");
   const [text, setText] = useState("");
   const [res, setRes] = useState<(ReadReply & { balance: number }) | null>(null);
+  const [scheduled, setScheduled] = useState<{ promiseDate: string; amount: number; followUpDate: string; riskBefore: number | null; riskAfter: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();
@@ -85,13 +88,13 @@ export function ReplyReader({ families }: { families: { id: string; parentName: 
       </div>
       <div>
         <label className={labelClass} htmlFor="rt">Paste their WhatsApp reply</label>
-        <textarea id="rt" rows={2} className={`${inputClass} py-2`} value={text} onChange={(e) => { setText(e.target.value); setRes(null); setSaved(false); }} placeholder="sir next week pakka istanu" />
+        <textarea id="rt" rows={2} className={`${inputClass} py-2`} value={text} onChange={(e) => { setText(e.target.value); setRes(null); setSaved(false); setScheduled(null); }} placeholder="sir next week pakka istanu" />
         <div className="mt-1 flex flex-wrap gap-2">
           {SAMPLES.map((s) => <button key={s} className="font-mono text-[11px] text-dusk-deep/60 underline" onClick={() => { setText(s); setRes(null); setSaved(false); }}>{s}</button>)}
         </div>
       </div>
       {error && <p className="font-mono text-sm text-brick">{error}</p>}
-      <Button variant="plaster" disabled={pending || !text.trim()} onClick={() => start(async () => { setError(null); const r = await readReplyAction(familyId, text); if (!r.ok) return setError(r.error); setRes({ ...r.result, balance: r.balance }); })}>
+      <Button variant="plaster" disabled={pending || !text.trim()} onClick={() => start(async () => { setError(null); const r = await readReplyAction(familyId, text); if (!r.ok) return setError(r.error); setRes({ ...r.result, balance: r.balance }); setScheduled(r.scheduled); setSaved(!!r.scheduled); })}>
         {pending ? "Reading…" : "Read reply"}
       </Button>
       {res && (
@@ -108,7 +111,14 @@ export function ReplyReader({ families }: { families: { id: string; parentName: 
               Save as promise
             </Button>
           )}
-          {saved && <p className="mt-2 font-mono text-xs text-lamp">Promise saved. Munshi will follow up if it&apos;s missed.</p>}
+          {saved && scheduled && (
+            <ul className="mt-2 space-y-0.5 font-mono text-xs">
+              <li className="text-lamp">Promise saved: {formatINR(scheduled.amount)} on {fmtKey(scheduled.promiseDate)}</li>
+              <li>Follow-up nudge scheduled for {fmtKey(scheduled.followUpDate)}, in case it&apos;s missed</li>
+              {scheduled.riskBefore !== null && scheduled.riskAfter !== null && <li>Forecast refreshed · rent risk {Math.round(scheduled.riskBefore * 100)}% → {Math.round(scheduled.riskAfter * 100)}%</li>}
+            </ul>
+          )}
+          {saved && !scheduled && <p className="mt-2 font-mono text-xs text-lamp">Promise saved. Munshi will follow up if it&apos;s missed.</p>}
         </div>
       )}
     </div>
