@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { RemindSheet } from "@/components/actions/RemindButton";
+import { RecordPaymentButton } from "@/components/actions/RecordPayment";
 import { Button } from "@/components/ui/Button";
 import { HouseStatus, type HouseState } from "@/components/ui/HouseStatus";
 import type { ReminderPayload } from "@/lib/data";
@@ -19,9 +20,10 @@ export type QueueCard = {
   bestTime?: string;
   payload: ReminderPayload;
   status: HouseState;
+  balance: number;
 };
 
-export function ChaseQueue({ cards }: { cards: QueueCard[] }) {
+export function ChaseQueue({ cards, today }: { cards: QueueCard[]; today: string }) {
   const [queue, setQueue] = useState(cards);
   const [dx, setDx] = useState(0);
   const [remindFor, setRemindFor] = useState<QueueCard | null>(null);
@@ -79,6 +81,7 @@ export function ChaseQueue({ cards }: { cards: QueueCard[] }) {
         <Button variant="ghost" className="text-plaster" onClick={done}>Skip</Button>
         <Button onClick={() => setRemindFor(top)}>Remind →</Button>
       </div>
+      <RecordPaymentButton key={top.familyId} familyId={top.familyId} balance={top.balance} today={today} title={`Payment from ${top.parent}`} label="Mark paid" variant="plaster" className="mt-2 w-full" onRecorded={(s) => s === "PAID" && done()} />
       <p className="mt-2 text-center font-mono text-[11px] text-plaster/50">Swipe right to remind, left to snooze</p>
       {remindFor && <RemindSheet key={remindFor.familyId} p={remindFor.payload} open onClose={() => setRemindFor(null)} onSent={done} />}
     </div>

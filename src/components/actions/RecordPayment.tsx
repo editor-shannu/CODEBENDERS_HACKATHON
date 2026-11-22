@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { Sheet } from "@/components/ui/Sheet";
 import { Button, inputClass, labelClass } from "@/components/ui/Button";
 import { Stamp } from "@/components/ui/Stamp";
-import { recordPayment } from "@/app/actions";
+import { recordFamilyPayment, recordPayment } from "@/app/actions";
 import { formatINR } from "@/lib/money";
 
 export function RecordPaymentButton({
@@ -15,7 +15,20 @@ export function RecordPaymentButton({
   label = "Mark paid",
   variant = "lamp",
   className = "",
-}: { invoiceId: string; balance: number; title: string; today: string; label?: string; variant?: "lamp" | "ghost" | "plaster" | "primary"; className?: string }) {
+  familyId,
+  onRecorded,
+}: {
+  invoiceId?: string;
+  balance: number;
+  title: string;
+  today: string;
+  label?: string;
+  variant?: "lamp" | "ghost" | "plaster" | "primary";
+  className?: string;
+  /** When set, the payment settles the family's oldest invoices first. */
+  familyId?: string;
+  onRecorded?: (status: "PAID" | "PARTIAL") => void;
+}) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(String(balance));
   const [mode, setMode] = useState<"CASH" | "UPI">("UPI");
@@ -28,12 +41,18 @@ export function RecordPaymentButton({
   const submit = () =>
     start(async () => {
       setError(null);
-      const res = await recordPayment({ invoiceId, amount: Number(amount), mode, reference, date });
+      const res = familyId
+        ? await recordFamilyPayment({ familyId, amount: Number(amount), mode, reference, date })
+        : invoiceId
+          ? await recordPayment({ invoiceId, amount: Number(amount), mode, reference, date })
+          : ({ ok: false, error: "Nothing to pay" } as const);
       if (!res.ok) return setError(res.error);
-      setStamped(res.status === "PAID" ? "PAID" : "PARTIAL");
+      const kind = res.status === "PAID" ? "PAID" : "PARTIAL";
+      setStamped(kind);
       setTimeout(() => {
         setOpen(false);
         setStamped(null);
+        onRecorded?.(kind);
       }, 1300);
     });
 

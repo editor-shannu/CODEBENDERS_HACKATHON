@@ -41,6 +41,30 @@ export async function recordPayment(input: { invoiceId: string; amount: number; 
   return { ok: true, status };
 }
 
+/** Records one payment for a family, settling its oldest unpaid invoices first (Chase Queue "Mark paid"). */
+export async function recordFamilyPayment(input: { familyId: string; amount: number; mode: string; reference?: string; date?: string }): Promise<ActionResult> {
+  const amount = Math.round(Number(input.amount));
+  if (!Number.isFinite(amount) || amount <= 0) return { ok: false, error: "Enter the amount received" };
+  if (input.mode !== "CASH" && input.mode !== "UPI") return { ok: false, error: "Pick cash or UPI" };
+  const invoices = await db.invoice.findMany({ where: { familyId: input.familyId }, include: { payments: true }, orderBy: { dueDate: "asc" } });
+  const open = invoices.map((i) => ({ inv: i, bal: i.amount - sumPaid(i.payments) })).filter((x) => x.bal > 0);
+  const due = open.reduce((s, x) => s + x.bal, 0);
+  if (!open.length) return { ok: false, error: "Nothing is due from this family" };
+  if (amount > due) return { ok: false, error: `Only ${due} is due from this family` };
+  let left = amount;
+  let status = "PARTIAL";
+  for (const { inv, bal } of open) {
+    if (left <= 0) break;
+    const part = Math.min(left, bal);
+    const res = await recordPayment({ invoiceId: inv.id, amount: part, mode: input.mode, reference: input.reference, date: input.date });
+    if (!res.ok) return res;
+    left -= part;
+  }
+  if (amount === due) status = "PAID";
+  refreshAll();
+  return { ok: true, status };
+}
+
 export async function addPromise(input: { familyId: string; promisedDate: string; amount: number; note?: string; source?: string }): Promise<ActionResult> {
   const parsed = promiseSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the details" };
