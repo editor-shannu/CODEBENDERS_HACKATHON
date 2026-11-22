@@ -5,28 +5,15 @@ import { randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import { addDays, dateInMonth, fromKey, monthKey, todayIST, toKey } from "@/lib/dates";
 import { familyMonthlyFee } from "@/lib/family-stats";
-import { computeStatus, sumPaid } from "@/lib/invoice-status";
+import { sumPaid } from "@/lib/invoice-status";
 import { seedDemo } from "@/lib/seed-data";
 import { settlePlanForBill, settlePlanForPayment } from "@/lib/munshi/plan";
+import { recalcInvoice } from "@/lib/invoices";
 import { billSchema, claimSchema, paymentSchema, promiseSchema, settingsSchema, studentSchema } from "@/lib/validators";
 
 export type ActionResult = { ok: true; message?: string; status?: string } | { ok: false; error: string };
 
 const refreshAll = () => revalidatePath("/", "layout");
-
-async function recalcInvoice(invoiceId: string) {
-  const inv = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { payments: true } });
-  const status = computeStatus(inv.amount, sumPaid(inv.payments), inv.status as "SENT");
-  await db.invoice.update({ where: { id: invoiceId }, data: { status } });
-  // a payment keeps any open promise from this family
-  if (status === "PAID") {
-    const today = todayIST();
-    const open = await db.payPromise.findMany({ where: { familyId: inv.familyId, kept: null } });
-    for (const p of open) await db.payPromise.update({ where: { id: p.id }, data: { kept: p.promisedDate >= addDays(today, -1) } });
-    await db.agentAction.updateMany({ where: { familyId: inv.familyId, status: { in: ["PENDING", "APPROVED"] }, type: { in: ["REMIND", "FOLLOW_UP"] } }, data: { status: "DONE" } });
-  }
-  return status;
-}
 
 export async function recordPayment(input: { invoiceId: string; amount: number; mode: string; reference?: string; date?: string }): Promise<ActionResult> {
   const parsed = paymentSchema.safeParse({ ...input, date: input.date ?? toKey(todayIST()) });
@@ -286,6 +273,15 @@ export async function logAgentAction(input: { type: string; title: string; detai
 }
 
 export async function setActionStatus(id: string, status: "APPROVED" | "DONE" | "SKIPPED"): Promise<ActionResult> {
+  if (status === "DONE") {
+    // approving a Munshi proposal carries it out (payment, promise, nudge, invoice, due date)
+    const { approveAction } = await import("@/lib/munshi/execute");
+    const line = await approveAction(id);
+    if (line) {
+      refreshAll();
+      return { ok: true, message: line };
+    }
+  }
   await db.agentAction.update({ where: { id }, data: { status } });
   refreshAll();
   return { ok: true };
@@ -296,7 +292,7 @@ export async function readReplyAction(familyId: string, text: string) {
   const { familyStats } = await import("@/lib/family-stats");
   const f = await db.family.findUnique({
     where: { id: familyId },
-    include: { students: true, invoices: { include: { payments: true } }, promises: true, reminders: true },
+    include: { students: true, invoices: { include: { payments: true } }, promises: true, reminders: { where: { status: "SENT" } } },
   });
   if (!f || !text.trim()) return { ok: false as const, error: "Pick a family and paste their reply" };
   const today = todayIST();
@@ -311,8 +307,20 @@ export async function askMunshiAction(question: string) {
   if (!question.trim()) return { ok: false as const, error: "Ask a question" };
   const { askMunshi } = await import("@/lib/munshi/agent");
   const { loadDashboard } = await import("@/lib/board-view");
-  const { board, forecast } = await loadDashboard();
-  const r = await askMunshi(question.trim().slice(0, 500), { families: board.families, forecast, totalPending: board.totalPending, today: board.today });
+  const { getOrigin } = await import("@/lib/origin");
+  const { board, forecast, input } = await loadDashboard();
+  const r = await askMunshi(question.trim().slice(0, 500), {
+    families: board.families,
+    forecast,
+    input,
+    totalPending: board.totalPending,
+    today: board.today,
+    autonomy: board.settings.autonomy,
+    centreName: board.settings.centreName,
+    tutorName: board.settings.tutorName,
+    origin: await getOrigin(),
+  });
+  if (r.actions?.length) refreshAll();
   return { ok: true as const, ...r };
 }
 

@@ -101,9 +101,12 @@ model Reminder {
   id       String   @id @default(cuid())
   familyId String
   family   Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  tone     String // GENTLE | FIRM | FINAL
-  language String
-  sentAt   DateTime @default(now())
+  tone         String // GENTLE | FIRM | FINAL
+  language     String
+  sentAt       DateTime  @default(now())
+  status       String    @default("SENT") // SENT | SCHEDULED | DONE
+  scheduledFor DateTime? // IST day a scheduled nudge is due (Munshi follow-ups)
+  note         String    @default("")
 }
 
 model Bill {

@@ -31,7 +31,7 @@ export async function loadFamilies(): Promise<FamilyLite[]> {
       students: { orderBy: { name: "asc" } },
       invoices: { include: { payments: { orderBy: { date: "asc" } } }, orderBy: { dueDate: "asc" } },
       promises: { orderBy: { promisedDate: "asc" } },
-      reminders: { orderBy: { sentAt: "desc" } },
+      reminders: { where: { status: "SENT" }, orderBy: { sentAt: "desc" } },
     },
     orderBy: { parentName: "asc" },
   });
