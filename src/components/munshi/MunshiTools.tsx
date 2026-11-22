@@ -7,7 +7,8 @@ import { addPromise, askMunshiAction, deferBill, dismissRentPlan, logAgentAction
 import { discountOfferText, waLink } from "@/lib/messages";
 import type { ReminderPayload } from "@/lib/data";
 import type { PlanStep } from "@/lib/munshi/rules";
-import type { ReadReply, TraceStep } from "@/lib/munshi/agent";
+import type { ChartData, ReadReply, TraceStep } from "@/lib/munshi/agent";
+import { AnswerChart } from "@/components/munshi/AnswerChart";
 import { formatINR } from "@/lib/money";
 
 export function PlanStepAction({ step, payload, discount }: { step: PlanStep; payload?: ReminderPayload; discount?: { language: string; parent: string; kids: string; month: string; amount: string; by: string; tutor: string; token: string | null } }) {
@@ -114,22 +115,30 @@ export function ReplyReader({ families }: { families: { id: string; parentName: 
   );
 }
 
-const QUESTIONS = ["Who should I chase today?", "Will I make rent?", "How much is pending?"];
+const QUESTIONS = ["Who should I chase today?", "Will I make rent?", "How much is pending?", "What if everyone pays 7 days late?"];
 
 export function AskMunshi({ aiOn }: { aiOn: boolean }) {
   const [q, setQ] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
   const [trace, setTrace] = useState<TraceStep[]>([]);
   const [source, setSource] = useState<string>("");
+  const [chart, setChart] = useState<ChartData | null>(null);
+  const [acts, setActs] = useState<{ title: string; status: string }[]>([]);
   const [pending, start] = useTransition();
   const ask = (question: string) =>
     start(async () => {
       setQ(question);
       const r = await askMunshiAction(question);
-      if (!r.ok) return setAnswer(r.error);
+      if (!r.ok) {
+        setChart(null);
+        setActs([]);
+        return setAnswer(r.error);
+      }
       setAnswer(r.answer);
       setTrace(r.trace);
       setSource(r.source);
+      setChart(r.chart ?? null);
+      setActs(r.actions ?? []);
     });
   return (
     <div className="space-y-3">
@@ -142,7 +151,13 @@ export function AskMunshi({ aiOn }: { aiOn: boolean }) {
       </div>
       {answer && (
         <div className="border border-dusk-deep/20 bg-white/50 p-3">
-          <p className="text-[15px] leading-relaxed">{answer}</p>
+          <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{answer}</p>
+          {chart && <AnswerChart chart={chart} />}
+          {acts.length > 0 && (
+            <ul className="mt-2 space-y-0.5 font-mono text-[11px]">
+              {acts.map((a, i) => <li key={i}>{a.title} · <span className={a.status === "done" ? "text-lamp" : "text-brick"}>{a.status}</span></li>)}
+            </ul>
+          )}
           {trace.length > 0 && (
             <details className="mt-2">
               <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-widest text-dusk-deep/60">Agent trace · {source === "AI" ? "AI with tool calls" : "offline rules"}</summary>
