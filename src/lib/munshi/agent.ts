@@ -162,6 +162,8 @@ export type ChartData =
 export type ChatLink = { label: string; url: string; kind: "whatsapp" | "page" };
 export type AskResult = { answer: string; trace: TraceStep[]; source: "AI" | "RULES"; chart?: ChartData; actions?: { id?: string; title: string; status: string }[]; links?: ChatLink[] };
 
+const familyMonthlyFeeOf = (f: FamilyWithStats) => f.students.reduce((t, k) => t + (Number((k as { monthlyFee?: number }).monthlyFee) || 0), 0) + f.stats.balance;
+
 export type Ctx = {
   families: FamilyWithStats[];
   forecast: ForecastResult;
@@ -245,7 +247,13 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx, so
     case "run_what_if": {
       const month = toKey(ctx.today).slice(0, 7);
       const w: WhatIf = {};
-      if (Number(args.extraDelayDays)) {
+      const nLate = Math.round(Number(args.lateFamilies) || 0);
+      if (nLate > 0) {
+        // "20 people pay late": the N families with the most fees at stake, 15 days unless the tutor said otherwise.
+        const ranked = [...ctx.families].sort((a, b) => familyMonthlyFeeOf(b) - familyMonthlyFeeOf(a));
+        const days = Number(args.extraDelayDays) || 15;
+        w.extraDelay = nLate >= ranked.length ? { familyId: "ALL", days } : { familyId: "SOME", days, familyIds: ranked.slice(0, nLate).map((f) => f.id) };
+      } else if (Number(args.extraDelayDays)) {
         const f = args.family ? findFamily(ctx, args.family) : undefined;
         w.extraDelay = { familyId: f?.id ?? "ALL", days: Number(args.extraDelayDays) };
       }
@@ -255,12 +263,12 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx, so
       const after = runForecast(ctx.input, w);
       const before = ctx.forecast;
       const pct = (r: number | undefined) => (r === undefined ? null : `${Math.round(r * 100)}%`);
-      const delayFam = w.extraDelay && w.extraDelay.familyId !== "ALL" ? ctx.families.find((x) => x.id === w.extraDelay!.familyId) : undefined;
+      const delayFam = w.extraDelay && w.extraDelay.familyId !== "ALL" && !w.extraDelay.familyIds ? ctx.families.find((x) => x.id === w.extraDelay!.familyId) : undefined;
       const diff = before.end90.p50 - after.end90.p50;
       return {
         result: {
           scenario: w,
-          scenarioLabel: w.extraDelay ? `${delayFam ? delayFam.parentName : "Everyone"} pays ${w.extraDelay.days} days late` : null,
+          scenarioLabel: w.extraDelay ? `${w.extraDelay.familyIds ? `${w.extraDelay.familyIds.length} of your ${ctx.families.length} families pay` : w.extraDelay.familyId === "ALL" && nLate ? `All ${ctx.families.length} families pay` : `${delayFam ? delayFam.parentName : "Everyone"} pays`} ${w.extraDelay.days} days late` : null,
           dropBy: formatINR(Math.abs(diff)),
           dropByRupees: Math.abs(diff),
           direction: diff >= 0 ? "drop" : "rise",
@@ -389,7 +397,7 @@ export const TOOLS = [
   fn("get_totals", "Total pending fees and counts", {}),
   fn("get_rent_risk", "Chance of being short on rent day from the 500-run cash forecast", {}),
   fn("get_family", "Details for one family by parent or child name", { name: S }, ["name"]),
-  fn("run_what_if", "Re-run the 500-run cash forecast with changes and compare before vs after", { extraDelayDays: N, family: S, loseStudents: N, feeRaise: N, newStudents: N, newStudentFee: N }),
+  fn("run_what_if", "Re-run the 500-run cash forecast with changes and compare before vs after. lateFamilies = how many families pay late (\"20 people pay late\"); extraDelayDays defaults to 15 then", { extraDelayDays: N, family: S, lateFamilies: N, loseStudents: N, feeRaise: N, newStudents: N, newStudentFee: N }),
   fn("draft_reminder", "Draft a WhatsApp reminder in the family's language with the real amount. Never sends.", { name: S, tone: { type: "string", enum: ["GENTLE", "FIRM", "FINAL"] } }, ["name"]),
   fn("schedule_nudge", "Schedule a reminder nudge for a family on a date (YYYY-MM-DD)", { name: S, date: S, tone: S }, ["name"]),
   fn("log_payment", "Propose recording a payment a family made (needs the tutor's approval)", { name: S, amount: N, mode: { type: "string", enum: ["CASH", "UPI"] } }, ["name", "amount"]),
@@ -479,7 +487,9 @@ async function rulesAnswer(q: string, ctx: Ctx): Promise<AskResult> {
     answer = r.drafted ? `${formatINR(tot)} is pending. Late: ${r.families.map((x) => `${x.parent.split(" ")[0]} ${formatINR(x.owes)} (${x.daysLate}d)`).join(", ")}. Tap a name to send their reminder.` : "Everyone has paid. Nothing pending.";
   } else if (/what if|what-if|suppose|scenario|\bif (i|we)\b|lose|drop ?out|raise|hike|new (student|admission)|admissions?|pay late|days late/.test(s) && !/(promise|paid|received)/.test(s)) {
     const args: Record<string, unknown> = {};
-    const late = num(s, /(\d+)\s*(?:more\s*)?days?\s*(?:late|delay)/);
+    const nFam = num(s, /(\d+)\s*(?:members?|people|persons?|families|parents|students|kids)\b/);
+    if (nFam) args.lateFamilies = nFam;
+    const late = num(s, /(\d+)\s*(?:more\s*)?days?\b/);
     if (late) args.extraDelayDays = late;
     if (late && named) args.family = named.parentName;
     const lose = num(s, /(?:lose|loses|drop|dropout of|leave)\s*(\d+)/) || (/(lose|drop ?out|leaves?)/.test(s) ? 1 : 0);
@@ -488,6 +498,7 @@ async function rulesAnswer(q: string, ctx: Ctx): Promise<AskResult> {
     if (raise) args.feeRaise = raise;
     const add = num(s, /(\d+)\s*new\s*(?:student|admission|kid)/);
     if (add) args.newStudents = add;
+    if (args.lateFamilies && !args.extraDelayDays) args.extraDelayDays = 15;
     if (!Object.keys(args).length) args.extraDelayDays = 7;
     const r = (await call("run_what_if", args)) as Parameters<typeof whatIfSentence>[0] & { runwayDaysBefore: number; runwayDaysAfter: number };
     answer = `${whatIfSentence(r)} Runway: ${r.runwayDaysAfter >= 90 ? "90+" : r.runwayDaysAfter} days (was ${r.runwayDaysBefore >= 90 ? "90+" : r.runwayDaysBefore}).`;
@@ -546,12 +557,13 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
   let chart: ChartData | undefined;
   const actions: { id?: string; title: string; status: string }[] = [];
   const links: ChatLink[] = [];
-  const results: unknown[] = [];
+  // Snapshot amounts count as looked up, so the amount guardrail keeps them.
+  const results: unknown[] = [{ totalPending: ctx.totalPending, balances: ctx.families.map((f) => f.stats.balance), end90: ctx.forecast.end90.p50, runway: ctx.forecast.runwayDays }];
   const whatIfs: Parameters<typeof whatIfSentence>[0][] = [];
   const byTool: Record<string, unknown> = {};
   const deadline = Date.now() + 15_000; // each model call gets 5 s; the whole loop at most 15 s, then the offline rules
   const messages: Msg[] = [
-    { role: "system", content: munshiSystemPrompt(ctx) + "\nYou are the tutor's personal assistant: warm, brief, proactive. Reply to small talk naturally, use the conversation so far to resolve 'him', 'her' or 'that family', act with tools when asked to do something on the dashboard, and end with one helpful next step." },
+    { role: "system", content: munshiSystemPrompt(ctx) + "\n" + dashboardSnapshot(ctx) + "\nYou are the tutor's personal assistant: warm, brief, proactive. Reply to small talk naturally, use the conversation so far to resolve 'him', 'her' or 'that family', act with tools when asked to do something on the dashboard, and end with one helpful next step. If the tutor corrects you (\"not 20 days, 20 people\"), redo the task with the correction instead of asking again; when a number of people or families pay late without a day count, call run_what_if with lateFamilies and assume 15 days, and say you assumed it. Never ask a question you can answer from the dashboard snapshot or the conversation." },
     ...(ctx.history ?? []).map((h) => ({ role: (h.who === "you" ? "user" : "assistant") as "user" | "assistant", content: h.text })),
     { role: "user", content: question },
   ];
@@ -618,6 +630,18 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
 }
 
 /** Munshi's system prompt (also quoted in the README). */
+/** What's on the tutor's dashboard right now, so Munshi knows the centre without a tool call. Amounts here count as tool results. */
+export function dashboardSnapshot(ctx: Ctx): string {
+  const owing = ctx.families.filter((f) => f.stats.balance > 0).sort((a, b) => b.stats.balance - a.stats.balance);
+  const rent = ctx.forecast.rent;
+  return [
+    `Dashboard now: ${ctx.families.length} families, ${owing.length} owe ${formatINR(ctx.totalPending)} in total.`,
+    owing.length ? `Owing: ${owing.map((f) => `${f.parentName} (child ${f.students.map((k) => k.name).join(" & ")}) ${formatINR(f.stats.balance)}, ${f.stats.oldestDaysLate} days late`).join("; ")}.` : "",
+    `Forecast: likely ${formatINR(ctx.forecast.end90.p50)} in 90 days; runway ${ctx.forecast.runwayDays} days${rent ? `; rent risk ${Math.round(rent.risk * 100)}%` : ""}.`,
+    `The tutor is ${ctx.tutorName}. You can do dashboard tasks with tools: record payments, add students, draft reminders, schedule nudges, record promises, create invoices, change due dates, run what-ifs.`,
+  ].filter(Boolean).join(" ");
+}
+
 export function munshiSystemPrompt(ctx: Pick<Ctx, "today" | "centreName" | "autonomy" | "direct">): string {
   return [
     `You are Munshi, the back-office clerk for ${ctx.centreName}, a home tuition centre in India. Today is ${formatDate(ctx.today)} (IST).`,
