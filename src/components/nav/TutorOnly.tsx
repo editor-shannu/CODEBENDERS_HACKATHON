@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 
 /** Pages that never show tutor chrome: the landing, sign-in, onboarding, the parent page and pay links. */
 export function isPublicPath(pathname: string) {
-  return pathname === "/" || pathname === "/parent" || pathname === "/login" || pathname === "/onboarding" || pathname.startsWith("/pay/");
+  return pathname === "/" || pathname === "/parent" || pathname === "/login" || pathname === "/onboarding" || pathname === "/pricing" || pathname.startsWith("/pay/") || pathname.startsWith("/join/");
 }
 
 /** Hides tutor chrome (header, nav, footer) on public pages. */

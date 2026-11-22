@@ -2,15 +2,26 @@
 
 **The back office for home tutors.** Who owes, what's coming, and a clerk that chases for you.
 
-Baaki (Telugu/Hindi for "what's still due") replaces the fee notebook and the awkward WhatsApp follow-up for India's solo home tutors. The demo runs for **Lakshmi Teaching Point**, a home tuition centre in Hyderabad, run by Lakshmi Devi, who teaches maths and science to classes 6 to 10.
+Baaki (Telugu/Hindi for "what's still due") replaces the fee notebook and the awkward WhatsApp follow-up for India's solo home tutors.
 
-Live demo: https://codebendershackathon.vercel.app
+Live: https://codebendershackathon.vercel.app · **Try the demo** (no sign-in): https://codebendershackathon.vercel.app/api/demo
+
+The demo opens a throwaway account for **Lakshmi Teaching Point**, a synthetic home tuition centre in Vizianagaram run by Lakshmi Devi, with 19 families of made-up data. Every demo account is isolated and deleted after 12 hours. Real accounts sign in with Google and start empty: no sample data is ever added to them.
 
 ## The problem
 
 Millions of home tutors in India collect fees in cash and UPI, track them in a notebook, and chase parents one WhatsApp message at a time. They don't know who's late until rent is due, and every reminder risks souring a relationship with a family they see every evening.
 
 ## What Baaki does
+
+### No typing: get data in the way tutors already work
+
+- **Tell Munshi**: one chat box on every screen. Type or speak in English, Telugu or Hindi: "Ravi paid 1500 cash", "add Sita class 8 ₹1500, mother Kavitha", "who hasn't paid?", "remind all late". Munshi does it, and reminders come back as one-tap WhatsApp buttons.
+- **Import the parents' WhatsApp group**: export the chat (Without media) and share or upload it. Baaki finds each parent, child and class, and every "paid" or "will pay Friday" message, and you tick what to keep.
+- **Parents add themselves**: share one join link or QR in the group. Parents fill in their child's name and class; you tap Approve.
+- **Someone paid?** Share a GPay or PhonePe screenshot, or paste a bank SMS, straight from the phone's share sheet (Baaki installs as an app). Munshi reads the amount and name and matches the family.
+
+### The back office
 
 - **Who-owes board**: every family's balance, how many days late, and promises made, computed live from today's date in IST.
 - **Chase Queue**: swipe right to remind, left to snooze. Families are ranked by a chase score built from amount, lateness, broken promises and reminder history.
@@ -19,9 +30,13 @@ Millions of home tutors in India collect fees in cash and UPI, track them in a n
 - **Munshi**: a clerk with a daily brief, a Rent Defense Plan, an approval inbox, a Reply Reader that turns "sir next week pakka istanu" into a dated promise, and Ask Munshi (an AI agent loop with tool calls and a visible trace). With no `LLM_API_KEY` it runs on offline rules, so the demo never breaks.
 - **Forecast**: a 500-run Monte Carlo cash cone, rent risk, runway, money weather, and Time Machine sliders (late payers, dropouts, fee raise, new admissions).
 - **Invoices**: monthly generation with sibling discount, UPI QR, Download PDF (print), and a public Parent Pay Link with an "I've paid" button the tutor confirms in one tap.
-- **Students, families, settings**: add or edit students, siblings, bills, festival and exam dates, the Munshi autonomy dial, and a one-tap demo reset.
+- **Students, families, settings**: add or edit students, siblings, bills, festival and exam dates, and the Munshi autonomy dial.
 - **Privacy**: Baaki stores no parent phone numbers. Reminders open WhatsApp with the message ready, and the tutor picks the chat.
 - **Sibling discount**: 10% off the second and later child, applied automatically to invoices.
+
+## Who pays
+
+The tutor, never the parent. Free for up to 10 students; **Baaki Pro ₹99 a month** (₹999 a year) for unlimited students, Munshi chat, WhatsApp import and the forecast; **Centre ₹299 a month** for 2 to 5 teachers. A tutor with 25 students at ₹2,000 has ₹50,000 a month in a notebook: one late family paying on time covers Pro for a year. Every pay link and join link a parent opens shows Baaki to the next tutor in the colony. See `/pricing` in the app. (Launch pricing; payments are not switched on in the hackathon build.)
 
 ## Tech stack
 
@@ -39,7 +54,7 @@ cd CODEBENDERS_HACKATHON
 npm install
 cp .env.example .env        # set DATABASE_URL
 npm run db:push             # create tables
-npm run db:seed             # optional: demo data (also seeds itself on first visit)
+npm run db:seed             # optional: synthetic demo data for local testing
 npm run dev                 # http://localhost:3000
 ```
 
@@ -55,7 +70,7 @@ npm run dev                 # http://localhost:3000
 
 1. Import the repo in Vercel.
 2. Add a Postgres database (Vercel → Storage → Neon, or any Neon/Supabase URL) and set `DATABASE_URL` in Project → Settings → Environment Variables. Use the pooled connection string with `?sslmode=require`.
-3. Deploy. The build creates the tables and the app seeds the demo centre on its first visit.
+3. Deploy. The build creates the tables. Real accounts start empty; `/api/demo` creates an isolated synthetic demo account.
 
 If `DATABASE_URL` is missing or wrong, the app shows a setup screen explaining what to fix instead of crashing.
 
@@ -128,14 +143,16 @@ textures re-encoded to WebP):
 
 1. **Database**: create a free Postgres on [Neon](https://neon.tech) and copy the pooled connection string (ends in `?sslmode=require`) into `DATABASE_URL` in `.env` (locally) or in Vercel's Environment Variables.
 2. **AI (optional)**: set `LLM_API_KEY` for any OpenAI-compatible endpoint. Groq is the default (`LLM_BASE_URL` = `https://api.groq.com/openai/v1`, `LLM_MODEL` = `openai/gpt-oss-120b`). Without a key every Munshi feature runs on offline rules.
-3. **Migrate and seed**: `npm run db:push` creates the tables, `npm run db:seed` loads Lakshmi Teaching Point dated from today (the app also seeds itself on first visit, and Settings has a one-tap demo reset).
-4. **Run**: `npm run dev`. There is no login: the demo opens straight on the tutor's dashboard, and parents open their own pay link.
+3. **Migrate and seed**: `npm run db:push` creates the tables, `npm run db:seed` loads the synthetic Lakshmi Teaching Point dated from today, for local testing only.
+4. **Run**: `npm run dev`. Tutors sign in with Google (Firebase). `/api/demo` opens a synthetic demo account with no sign-in. Parents open their own pay link or join link and never sign in.
 
 ### Munshi's system prompt
 
 Built in `munshiSystemPrompt()` in `src/lib/munshi/agent.ts`:
 
-> You are Munshi, the back-office clerk for {centre}, a home tuition centre in Hyderabad, India. Today is {date} (IST). Use the tools to look up real numbers before answering. Every amount and date you state must come from a tool result in this conversation; never invent or estimate one. Answer in 1 to 3 short sentences, amounts in rupees with Indian grouping (₹14,500). Be practical and kind about parents. Never threaten, shame, or pressure a family, and never suggest stopping a child's classes as a punishment. Never share one family's fees, promises or notes in a message meant for another family. Reminders are drafts in the family's own language (te, hi or en); you never send them. The tutor sends from WhatsApp. The autonomy dial is {mode}. Write tools may land in the approval inbox; say so when they do. Money actions (payments, invoices, due dates) always wait for the tutor.
+> You are Munshi, the back-office clerk for {centre}, a home tuition centre in India. Today is {date} (IST). Use the tools to look up real numbers before answering. Every amount and date you state must come from a tool result in this conversation; never invent or estimate one. Answer in 1 to 3 short sentences, amounts in rupees with Indian grouping (₹14,500). Be practical and kind about parents. Never threaten, shame, or pressure a family, and never suggest stopping a child's classes as a punishment. Never share one family's fees, promises or notes in a message meant for another family. Reminders are drafts in the family's own language (te, hi or en); you never send them. The tutor sends from WhatsApp. The autonomy dial is {mode}. Write tools may land in the approval inbox; say so when they do. Money actions (payments, invoices, due dates) always wait for the tutor.
+>
+> In the chat box the last sentence is replaced with: the tutor is typing to you; treat clear instructions as done ("Ravi paid 1500 cash" means log_payment, "add Sita class 8 1200" means add_student, "remind all late" means remind_all_late); ask one short question only when a required detail is missing. A payment from chat is recorded only when the tutor's own words say the family paid.
 
 The Reply Reader uses a second, JSON-only prompt: read a parent's WhatsApp reply (English, Telugu, Hindi, Tenglish or Hinglish), only report a date or amount the parent actually said, and return `{promisedDate, amount, confidence, summary}`.
 
@@ -195,7 +212,7 @@ Every write goes through `proposeOrRun()` in `src/lib/munshi/execute.ts`. With t
 
 ## Roadmap
 
-WhatsApp Business API sending · multi-tutor accounts · Telugu-script names in Voice Khata.
+WhatsApp Business API sending (needs Meta approval) · UPI AutoPay for subscriptions · bank SMS auto-read in an Android app · multi-teacher Centre plan · Telugu-script names in Voice Khata.
 
 ## Team
 

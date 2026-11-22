@@ -32,6 +32,9 @@ model Settings {
   startingBalance Int    @default(0)
   autonomy        String @default("ASK") // SUGGEST | ASK | AUTO
   monthlyGoal     Int    @default(0) // Goal Mode: rupees to collect this month (0 = off)
+  joinCode        String? // public code for the parent self-join link (/join/[code])
+
+  @@index([joinCode])
 }
 
 model Family {
@@ -199,6 +202,34 @@ model AgentAction {
   plan      AgentPlan? @relation(fields: [planId], references: [id], onDelete: Cascade)
   step      Int?
   createdAt DateTime   @default(now())
+
+  @@index([userId])
+}
+
+// A parent added themselves through the tutor's join link. Nothing is a family until the tutor approves.
+model JoinRequest {
+  id         String   @id @default(cuid())
+  userId     String   @default("") // owner (User.id); scoped by the tenant extension in src/lib/db.ts
+  parentName String
+  language   String   @default("te")
+  kids       String   @default("[]") // JSON [{ name, batch }]
+  note       String   @default("")
+  status     String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  source     String   @default("LINK") // LINK | WHATSAPP
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Something shared to Baaki from the phone's share menu (a WhatsApp chat export, a payment screenshot or SMS).
+model InboxItem {
+  id        String   @id @default(cuid())
+  userId    String   @default("") // owner (User.id); scoped by the tenant extension in src/lib/db.ts
+  kind      String // CHAT | PAYMENT_TEXT | PAYMENT_IMAGE
+  text      String   @default("")
+  image     String   @default("") // data URL, payment screenshots only
+  status    String   @default("NEW") // NEW | DONE
+  createdAt DateTime @default(now())
 
   @@index([userId])
 }

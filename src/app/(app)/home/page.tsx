@@ -37,6 +37,33 @@ export default async function HomePage() {
         <h1 className="font-display text-4xl leading-none md:text-5xl">Here&apos;s your back office today.</h1>
       </div>
 
+      {!families.length ? (
+        <Card className="mb-5 p-5">
+          <Eyebrow>Get your class in, without typing</Eyebrow>
+          <p className="mt-1 font-display text-2xl">Your students are already in WhatsApp. Bring them here.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <Link href="/import" className="border-2 border-dusk-deep p-3 hover:border-brick">
+              <p className="font-display text-xl">Import your parents&apos; group</p>
+              <p className="text-xs text-dusk-deep/70">Export the chat. Munshi finds every parent, child, payment and promise.</p>
+            </Link>
+            <Link href="/students" className="border-2 border-dusk-deep p-3 hover:border-brick">
+              <p className="font-display text-xl">Share a join link</p>
+              <p className="text-xs text-dusk-deep/70">Parents add their own child. You tap Approve.</p>
+            </Link>
+            <Link href="/students/new" className="border border-dusk-deep/40 p-3 hover:border-brick">
+              <p className="font-display text-xl">Add one by hand</p>
+              <p className="text-xs text-dusk-deep/70">Or just tell Munshi: &quot;add Sita class 8 ₹1500&quot;.</p>
+            </Link>
+          </div>
+        </Card>
+      ) : (
+        <div className="mb-4 flex flex-wrap gap-2 font-mono text-[11px] uppercase tracking-widest">
+          <Link href="/paid" className="border border-plaster/40 px-3 py-2 hover:border-lamp hover:text-lamp">Someone paid · screenshot or SMS</Link>
+          <Link href="/import" className="border border-plaster/40 px-3 py-2 hover:border-lamp hover:text-lamp">Import WhatsApp group</Link>
+          <Link href="/students" className="border border-plaster/40 px-3 py-2 hover:border-lamp hover:text-lamp">Join link for parents</Link>
+        </div>
+      )}
+
       <div className="grid-bento">
         {/* Total pending */}
         <Link href="/owes" className="col-span-2 row-span-2 block">

@@ -310,7 +310,7 @@ export async function readReplyAction(familyId: string, text: string) {
   return { ok: true as const, result: r, balance, scheduled };
 }
 
-export async function askMunshiAction(question: string) {
+export async function askMunshiAction(question: string, opts: { direct?: boolean } = {}) {
   if (!question.trim()) return { ok: false as const, error: "Ask a question" };
   const { askMunshi } = await import("@/lib/munshi/agent");
   const { loadDashboard } = await import("@/lib/board-view");
@@ -326,8 +326,10 @@ export async function askMunshiAction(question: string) {
     centreName: board.settings.centreName,
     tutorName: board.settings.tutorName,
     origin: await getOrigin(),
+    direct: !!opts.direct,
+    question: question.trim().slice(0, 500),
   });
-  if (r.actions?.length) refreshAll();
+  if (r.actions?.length || r.links?.length) refreshAll();
   return { ok: true as const, ...r };
 }
 
@@ -414,4 +416,44 @@ export async function setStudentPause(studentId: string, months: string[]): Prom
   await db.agentAction.create({ data: { type: "NOTE", familyId: s.familyId, title: clean.length ? `Fee paused for ${s.name}: ${clean.join(", ")}` : `Fee pause cleared for ${s.name}`, status: "DONE", source: "RULES" } });
   refreshAll();
   return { ok: true, message: clean.length ? `Paused for ${clean.length} month${clean.length > 1 ? "s" : ""}` : "Pause cleared" };
+}
+
+/* ---------- Payment screenshot (GPay / PhonePe / Paytm) ---------- */
+/** Reads a payment screenshot with a vision model and returns it as SMS-style text for Paste & Match. */
+export async function readScreenshotAction(dataUrl: string): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  if (typeof dataUrl !== "string" || !/^data:image\/(png|jpe?g|webp);base64,/.test(dataUrl)) return { ok: false, error: "Pick a PNG or JPG screenshot" };
+  if (dataUrl.length > 5_600_000) return { ok: false, error: "That image is too big (max 4 MB)" };
+  await currentUserId();
+  if (!process.env.LLM_API_KEY) return { ok: false, error: "Reading screenshots needs the AI key on this deploy. Paste the payment SMS instead." };
+  const base = (process.env.LLM_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, "");
+  try {
+    const res = await fetch(`${base}/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${process.env.LLM_API_KEY}` },
+      body: JSON.stringify({
+        model: process.env.LLM_VISION_MODEL || "meta-llama/llama-4-scout-17b-16e-instruct",
+        temperature: 0,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: 'This is an Indian UPI payment screenshot (GPay, PhonePe, Paytm, BHIM or a bank app). Read only what is printed. Return JSON {"amount":number|null,"payer":"name of the person who PAID"|null,"payee":"name paid to"|null,"utr":"UPI transaction / reference id"|null,"date":"YYYY-MM-DD"|null,"status":"success"|"failed"|"pending"|null}.' },
+              { type: "image_url", image_url: { url: dataUrl } },
+            ],
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(25_000),
+    });
+    if (!res.ok) return { ok: false, error: `Couldn't read the screenshot (AI ${res.status}). Paste the SMS instead.` };
+    const j = JSON.parse((await res.json()).choices?.[0]?.message?.content ?? "{}") as { amount?: number; payer?: string; utr?: string; date?: string; status?: string };
+    if (j.status === "failed") return { ok: false, error: "This screenshot shows a failed payment." };
+    if (!j.amount) return { ok: false, error: "No amount found in that screenshot." };
+    const [y, m, d] = (j.date ?? "").split("-");
+    const text = `Rs.${j.amount} credited by UPI${j.payer ? ` from ${j.payer}` : ""}${j.date && d ? ` on ${d}-${m}-${y.slice(2)}` : ""}.${j.utr ? ` UPI Ref No ${String(j.utr).replace(/\D/g, "").slice(0, 16)}.` : ""}`;
+    return { ok: true, text };
+  } catch (e) {
+    return { ok: false, error: `Couldn't read the screenshot (${e instanceof Error ? e.message : "error"}). Paste the SMS instead.` };
+  }
 }

@@ -29,6 +29,7 @@ export async function getSettings(): Promise<SettingsRow> {
       startingBalance: 0,
       autonomy: "ASK",
       monthlyGoal: 0,
+      joinCode: null,
     }
   );
 }

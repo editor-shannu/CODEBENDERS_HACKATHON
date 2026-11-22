@@ -1,4 +1,8 @@
 import Link from "next/link";
+import QRCode from "qrcode";
+import { JoinInbox } from "@/components/join/JoinInbox";
+import { ensureJoinCode, parseKids, suggestedFee } from "@/lib/join";
+import { getOrigin } from "@/lib/origin";
 import { Card, EmptyState, Eyebrow, PageHeader } from "@/components/ui/Card";
 import { LinkButton } from "@/components/ui/Button";
 import { HouseStatus, houseStatusOf } from "@/components/ui/HouseStatus";
@@ -6,7 +10,6 @@ import { MoneyText } from "@/components/ui/MoneyText";
 import { Guard } from "@/components/setup/Guard";
 import { db } from "@/lib/db";
 import { loadBoard } from "@/lib/data";
-import { BATCHES } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 
@@ -17,15 +20,31 @@ export default function StudentsPage() {
         const students = await db.student.findMany({ include: { family: true }, orderBy: [{ active: "desc" }, { name: "asc" }] });
         const active = students.filter((s) => s.active);
         const board = await loadBoard();
+        const code = await ensureJoinCode();
+        const joinUrl = `${await getOrigin()}/join/${code}`;
+        const qr = await QRCode.toDataURL(joinUrl, { margin: 1, width: 240, color: { dark: "#1b2444", light: "#fbf6ea" } });
+        const settings = await db.settings.findFirst({ select: { centreName: true } });
+        const requests = await db.joinRequest.findMany({ where: { status: "PENDING" }, orderBy: { createdAt: "desc" } });
+        const joinRows = requests.map((r) => ({
+          id: r.id,
+          parentName: r.parentName,
+          note: r.note,
+          createdAt: r.createdAt.toISOString(),
+          kids: parseKids(r.kids).map((k) => ({ ...k, fee: suggestedFee(k.batch, students) })),
+        }));
         const house = new Map(board.families.map((f) => [f.id, houseStatusOf(f.stats.balance, !!f.stats.openPromise)] as const));
         return (
           <div>
             <PageHeader title="Students" kicker={`${active.length} active · ${students.length - active.length} inactive`}>
               <LinkButton href="/students/new">Add student</LinkButton>
             </PageHeader>
-            {!students.length && <EmptyState title="No students yet" body="Add your first student to start tracking fees." />}
+            <Card className="mb-6">
+              <Eyebrow className="mb-3">Parents add themselves{joinRows.length ? ` · ${joinRows.length} waiting` : ""}</Eyebrow>
+              <JoinInbox url={joinUrl} qr={qr} centre={settings?.centreName ?? "our classes"} rows={joinRows} />
+            </Card>
+            {!students.length && <EmptyState title="No students yet" body="Share the join link above, import your WhatsApp group, or add a student by hand." />}
             <div className="space-y-6">
-              {[...BATCHES, "Inactive"].map((batch) => {
+              {[...Array.from(new Set(active.map((s) => s.batch))).sort(), "Inactive"].map((batch) => {
                 const list = batch === "Inactive" ? students.filter((s) => !s.active) : active.filter((s) => s.batch === batch);
                 if (!list.length) return null;
                 return (

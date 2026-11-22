@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const LANGUAGES = ["en", "te", "hi"] as const;
+/** Suggested batch names; a tutor may type any batch or class name. */
 export const BATCHES = ["Class 6-7 Evening", "Class 8 Maths", "Class 9-10 Board Prep"] as const;
 export const MODES = ["CASH", "UPI"] as const;
 export const TONES = ["GENTLE", "FIRM", "FINAL"] as const;
@@ -8,7 +9,7 @@ export const AUTONOMY = ["SUGGEST", "ASK", "AUTO"] as const;
 
 export const studentSchema = z.object({
   name: z.string().trim().min(2, "Name is too short"),
-  batch: z.enum(BATCHES),
+  batch: z.string().trim().min(1, "Add the class or batch").max(40),
   monthlyFee: z.coerce.number().int().min(100, "Fee looks too low").max(50000),
   dueDay: z.coerce.number().int().min(1).max(28),
   familyId: z.string().optional(),

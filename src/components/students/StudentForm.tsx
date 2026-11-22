@@ -12,7 +12,7 @@ type Student = { id: string; name: string; batch: string; monthlyFee: number; du
 export function StudentForm({ families, student, defaultFamilyId }: { families: Family[]; student?: Student; defaultFamilyId?: string }) {
   const router = useRouter();
   const [name, setName] = useState(student?.name ?? "");
-  const [batch, setBatch] = useState(student?.batch ?? BATCHES[0]);
+  const [batch, setBatch] = useState<string>(student?.batch ?? "");
   const [fee, setFee] = useState(String(student?.monthlyFee ?? 800));
   const [dueDay, setDueDay] = useState(String(student?.dueDay ?? 10));
   const [familyId, setFamilyId] = useState(student?.familyId ?? defaultFamilyId ?? "");
@@ -39,9 +39,8 @@ export function StudentForm({ families, student, defaultFamilyId }: { families: 
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <label className={labelClass} htmlFor="batch">Batch</label>
-          <select id="batch" className={inputClass} value={batch} onChange={(e) => setBatch(e.target.value as typeof batch)}>
-            {BATCHES.map((b) => <option key={b}>{b}</option>)}
-          </select>
+          <input id="batch" list="batch-list" className={inputClass} value={batch} placeholder="e.g. Class 8 Maths" onChange={(e) => setBatch(e.target.value)} />
+          <datalist id="batch-list">{BATCHES.map((b) => <option key={b} value={b} />)}</datalist>
         </div>
         <div>
           <label className={labelClass} htmlFor="fee">Monthly fee (₹)</label>

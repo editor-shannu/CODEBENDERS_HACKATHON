@@ -8,6 +8,8 @@ import { formatINR } from "@/lib/money";
 import { labelClass } from "@/components/ui/Button";
 
 export function TimeMachine({ input, month }: { input: ForecastInput; month: string }) {
+  const owing = useMemo(() => [...input.families].filter((f) => f.monthlyTotal > 0).sort((a, b) => b.monthlyTotal - a.monthlyTotal), [input.families]);
+  const [who, setWho] = useState<string>("ALL");
   const [delay, setDelay] = useState(0);
   const [lose, setLose] = useState(0);
   const [raise, setRaise] = useState(0);
@@ -16,12 +18,12 @@ export function TimeMachine({ input, month }: { input: ForecastInput; month: str
   const base = useMemo(() => runForecast(input), [input]);
   const whatIf: WhatIf = useMemo(
     () => ({
-      ...(delay ? { extraDelay: { familyId: "ALL", days: delay } } : {}),
+      ...(delay ? { extraDelay: { familyId: who, days: delay } } : {}),
       ...(lose ? { loseStudents: { count: lose, fromMonth: month } } : {}),
       ...(raise ? { feeRaise: { amount: raise, fromMonth: month } } : {}),
       ...(add ? { addStudents: { count: add, fee: 800, fromMonth: month } } : {}),
     }),
-    [delay, lose, raise, add, month],
+    [who, delay, lose, raise, add, month],
   );
   const changed = delay || lose || raise || add;
   const sim = useMemo(() => (changed ? runForecast(input, whatIf) : base), [changed, input, whatIf, base]);
@@ -61,11 +63,27 @@ export function TimeMachine({ input, month }: { input: ForecastInput; month: str
 
       <div className="ruled-paper space-y-3 border border-dusk-deep/15 p-4 text-dusk-deep">
         <p className="font-display text-2xl">Time Machine</p>
-        {slider("Everyone pays later by", delay, setDelay, 0, 30, 1, (n) => `${n} days`)}
+        <div>
+          <label className={labelClass} htmlFor="tm-who">Who pays late</label>
+          <select id="tm-who" value={who} onChange={(e) => setWho(e.target.value)} className="mt-1 min-h-10 w-full border border-dusk-deep/30 bg-transparent px-2 font-mono text-sm">
+            <option value="ALL">Everyone</option>
+            {owing.map((f) => (
+              <option key={f.id} value={f.id}>{f.name} · {formatINR(f.monthlyTotal)}/month</option>
+            ))}
+          </select>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {owing[0] && (
+              <button type="button" className="border border-brick px-2 py-1 font-mono text-[11px] uppercase tracking-wider text-brick" onClick={() => { setWho(owing[0].id); setDelay(15); }}>
+                Biggest family pays 15 days late
+              </button>
+            )}
+          </div>
+        </div>
+        {slider(who === "ALL" ? "Everyone pays later by" : "This family pays later by", delay, setDelay, 0, 45, 1, (n) => `${n} days`)}
         {slider("Students leave", lose, setLose, 0, 6, 1, (n) => `${n}`)}
         {slider("Fee raise per student", raise, setRaise, 0, 300, 50, (n) => formatINR(n))}
         {slider("New admissions (₹800 each)", add, setAdd, 0, 6, 1, (n) => `${n}`)}
-        {changed ? <button className="font-mono text-[11px] uppercase tracking-widest text-brick" onClick={() => { setDelay(0); setLose(0); setRaise(0); setAdd(0); }}>Reset</button> : null}
+        {changed ? <button className="font-mono text-[11px] uppercase tracking-widest text-brick" onClick={() => { setWho("ALL"); setDelay(0); setLose(0); setRaise(0); setAdd(0); }}>Reset</button> : null}
       </div>
 
       <div className="border border-plaster/20 p-4">

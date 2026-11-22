@@ -7,7 +7,7 @@ const COPY: Record<Exclude<DbHealth, { ok: true }>["reason"], { title: string; s
     steps: [
       "Create a free Postgres database (Neon or Supabase, or Vercel → Storage → Neon).",
       "Add its connection string as DATABASE_URL in Vercel → Project → Settings → Environment Variables.",
-      "Redeploy. Tables are created during the build and demo data seeds itself on the first visit.",
+      "Redeploy. Tables are created during the build. Your account starts empty; the Demo button on the landing page shows synthetic data.",
     ],
   },
   no_tables: {
