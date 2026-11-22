@@ -9,8 +9,21 @@ datasource db {
 
 // Money is stored as whole rupees (Int). "Enum" fields are strings validated with Zod.
 
+// One account per Google sign-in (Firebase). Every row below belongs to exactly one user via userId.
+model User {
+  id          String    @id @default(cuid())
+  firebaseUid String    @unique
+  email       String    @unique
+  name        String    @default("")
+  photoUrl    String    @default("")
+  createdAt   DateTime  @default(now())
+  lastLoginAt DateTime  @default(now())
+  settings    Settings?
+}
+
 model Settings {
-  id              Int    @id @default(1)
+  userId          String @id
+  user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tutorName       String
   centreName      String
   city            String @default("Hyderabad")
@@ -22,34 +35,41 @@ model Settings {
 }
 
 model Family {
-  id         String      @id @default(cuid())
+  id         String       @id @default(cuid())
+  userId     String       @default("") // owner (User.id); scoped by the tenant extension in src/lib/db.ts
   parentName String
-  phone      String      @default("") // unused: Baaki never stores parent phone numbers
-  language   String      @default("te") // en | te | hi
-  notes      String      @default("")
-  memory     String      @default("{}") // Munshi's learned notes (JSON)
-  createdAt  DateTime    @default(now())
+  phone      String       @default("") // unused: Baaki never stores parent phone numbers
+  language   String       @default("te") // en | te | hi
+  notes      String       @default("")
+  memory     String       @default("{}") // Munshi's learned notes (JSON)
+  createdAt  DateTime     @default(now())
   students   Student[]
   invoices   Invoice[]
   promises   PayPromise[]
   reminders  Reminder[]
+
+  @@index([userId])
 }
 
 model Student {
-  id         String  @id @default(cuid())
-  familyId   String
-  family     Family  @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  name       String
-  batch      String
-  monthlyFee Int
+  id           String  @id @default(cuid())
+  userId       String  @default("") // owner (User.id); scoped by the tenant extension in src/lib/db.ts
+  familyId     String
+  family       Family  @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  name         String
+  batch        String
+  monthlyFee   Int
   dueDay       Int
   active       Boolean @default(true)
   pausedMonths String  @default("") // Fee Pause: comma-separated YYYY-MM months with no invoice
+
+  @@index([userId])
 }
 
 model Invoice {
   id        String         @id @default(cuid())
-  number    String         @unique
+  userId    String         @default("") // owner (User.id); scoped by the tenant extension in src/lib/db.ts
+  number    String
   familyId  String
   family    Family         @relation(fields: [familyId], references: [id], onDelete: Cascade)
   month     String // YYYY-MM
@@ -64,10 +84,13 @@ model Invoice {
   claims    PaymentClaim[]
 
   @@unique([familyId, month])
+  @@unique([userId, number])
+  @@index([userId])
 }
 
 model Payment {
   id        String   @id @default(cuid())
+  userId    String   @default("") // owner (User.id); scoped by the tenant extension in src/lib/db.ts
   invoiceId String
   invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   amount    Int
@@ -75,20 +98,26 @@ model Payment {
   mode      String // CASH | UPI
   reference String?
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model PaymentClaim {
   id        String   @id @default(cuid())
+  userId    String   @default("") // owner (User.id); scoped by the tenant extension in src/lib/db.ts
   invoiceId String
   invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   amount    Int
   reference String
   status    String   @default("PENDING") // PENDING | CONFIRMED | REJECTED
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model PayPromise {
   id           String   @id @default(cuid())
+  userId       String   @default("") // owner (User.id); scoped by the tenant extension in src/lib/db.ts
   familyId     String
   family       Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
   promisedDate DateTime
@@ -97,52 +126,67 @@ model PayPromise {
   source       String   @default("MANUAL") // MANUAL | MUNSHI
   note         String   @default("")
   createdAt    DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Reminder {
-  id       String   @id @default(cuid())
-  familyId String
-  family   Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  id           String    @id @default(cuid())
+  userId       String    @default("") // owner (User.id); scoped by the tenant extension in src/lib/db.ts
+  familyId     String
+  family       Family    @relation(fields: [familyId], references: [id], onDelete: Cascade)
   tone         String // GENTLE | FIRM | FINAL
   language     String
   sentAt       DateTime  @default(now())
   status       String    @default("SENT") // SENT | SCHEDULED | DONE
   scheduledFor DateTime? // IST day a scheduled nudge is due (Munshi follow-ups)
   note         String    @default("")
+
+  @@index([userId])
 }
 
 model Bill {
   id        String  @id @default(cuid())
+  userId    String  @default("") // owner (User.id); scoped by the tenant extension in src/lib/db.ts
   name      String
   amount    Int
   dueDay    Int
   recurring Boolean @default(true)
   flexible  Boolean @default(false)
   deferDays Int     @default(0)
+
+  @@index([userId])
 }
 
 model KeyDate {
   id               String   @id @default(cuid())
+  userId           String   @default("") // owner (User.id); scoped by the tenant extension in src/lib/db.ts
   name             String
   startDate        DateTime
   endDate          DateTime
   collectionFactor Float    @default(0.6)
+
+  @@index([userId])
 }
 
 model AgentPlan {
-  id        String        @id @default(cuid())
-  title     String
-  goal      String
-  status    String        @default("PROPOSED") // PROPOSED | ACTIVE | DONE | DISMISSED
-  gap        Int          @default(0) // rupees the plan has to cover before rent day
-  rentAmount Int          @default(0)
-  rentDate   String       @default("") // YYYY-MM-DD (IST)
-  createdAt DateTime      @default(now())
-  actions   AgentAction[]
+  id         String        @id @default(cuid())
+  userId     String        @default("") // owner (User.id); scoped by the tenant extension in src/lib/db.ts
+  title      String
+  goal       String
+  status     String        @default("PROPOSED") // PROPOSED | ACTIVE | DONE | DISMISSED
+  gap        Int           @default(0) // rupees the plan has to cover before rent day
+  rentAmount Int           @default(0)
+  rentDate   String        @default("") // YYYY-MM-DD (IST)
+  createdAt  DateTime      @default(now())
+  actions    AgentAction[]
+
+  @@index([userId])
 }
 
 model AgentAction {
   id        String     @id @default(cuid())
+  userId    String     @default("") // owner (User.id); scoped by the tenant extension in src/lib/db.ts
   type      String // REMIND | FOLLOW_UP | DISCOUNT | DEFER_BILL | DUE_DATE | PROMISE | NOTE
   familyId  String?
   title     String
@@ -155,4 +199,6 @@ model AgentAction {
   plan      AgentPlan? @relation(fields: [planId], references: [id], onDelete: Cascade)
   step      Int?
   createdAt DateTime   @default(now())
+
+  @@index([userId])
 }

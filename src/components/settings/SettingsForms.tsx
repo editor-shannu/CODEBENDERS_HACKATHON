@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button, inputClass, labelClass } from "@/components/ui/Button";
-import { deleteBill, deleteKeyDate, resetDemo, saveBill, saveKeyDate, saveSettings } from "@/app/actions";
+import { deleteBill, deleteKeyDate, saveBill, saveKeyDate, saveSettings } from "@/app/actions";
 import { formatINR } from "@/lib/money";
 
 type S = { tutorName: string; centreName: string; upiId: string; upiName: string; startingBalance: number; autonomy: string; monthlyGoal: number };
@@ -14,7 +14,8 @@ const AUTONOMY = [
   { id: "AUTO", label: "Auto", hint: "Gentle reminders on its own" },
 ];
 
-export function SettingsForm({ s }: { s: S }) {
+export function SettingsForm({ s, next, submitLabel = "Save settings" }: { s: S; next?: string; submitLabel?: string }) {
+  const router = useRouter();
   const [v, setV] = useState(s);
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -46,7 +47,7 @@ export function SettingsForm({ s }: { s: S }) {
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <Button disabled={pending} onClick={() => start(async () => { const r = await saveSettings({ ...v, startingBalance: Number(v.startingBalance) || 0, monthlyGoal: Number(v.monthlyGoal) || 0 }); setMsg(r.ok ? r.message ?? "Saved" : r.error); })}>Save settings</Button>
+        <Button disabled={pending} onClick={() => start(async () => { const r = await saveSettings({ ...v, startingBalance: Number(v.startingBalance) || 0, monthlyGoal: Number(v.monthlyGoal) || 0 }); setMsg(r.ok ? r.message ?? "Saved" : r.error); if (r.ok && next) router.push(next); })}>{submitLabel}</Button>
         {msg && <span className="font-mono text-xs">{msg}</span>}
       </div>
     </div>
@@ -113,27 +114,6 @@ export function KeyDatesEditor({ dates }: { dates: { id: string; name: string; s
       </div>
       {error && <p className="font-mono text-sm text-brick">{error}</p>}
       <Button variant="plaster" disabled={pending} onClick={() => run(async () => { const r = await saveKeyDate({ name, start, end, factor: Number(factor) }); if (!r.ok) return setError(r.error); setName(""); setStart(""); setEnd(""); setError(null); })}>Add key date</Button>
-    </div>
-  );
-}
-
-export function ResetDemoButton() {
-  const router = useRouter();
-  const [msg, setMsg] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-  return (
-    <div className="flex items-center gap-3">
-      <Button
-        variant="danger"
-        disabled={pending}
-        onClick={() => {
-          if (!confirm("Reset all data to the demo centre, dated from today?")) return;
-          start(async () => { const r = await resetDemo(); setMsg(r.ok ? r.message ?? "Reset" : r.error); router.refresh(); });
-        }}
-      >
-        {pending ? "Resetting…" : "Reset demo data"}
-      </Button>
-      {msg && <span className="font-mono text-xs">{msg}</span>}
     </div>
   );
 }

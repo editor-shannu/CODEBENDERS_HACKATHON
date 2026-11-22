@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Db } from "../db";
 import { db } from "../db";
 import { daysBetween, fromKey } from "../dates";
 import { learnedDay, ordinal } from "./rules";
@@ -24,7 +24,7 @@ export function usualDayOf(mem: Memory): number | null {
   return learnedDay(mem);
 }
 
-async function save(familyId: string, update: (m: Memory) => Memory, client: PrismaClient = db) {
+async function save(familyId: string, update: (m: Memory) => Memory, client: Db = db) {
   const f = await client.family.findUnique({ where: { id: familyId }, select: { memory: true } });
   if (!f) return;
   const next = update(read(f.memory));
@@ -32,7 +32,7 @@ async function save(familyId: string, update: (m: Memory) => Memory, client: Pri
 }
 
 /** Recomputes usual pay day, usual method, lateness and promise habit from the family's history. */
-export async function learnFromHistory(familyId: string, client: PrismaClient = db) {
+export async function learnFromHistory(familyId: string, client: Db = db) {
   const [payments, invoices, promises] = await Promise.all([
     client.payment.findMany({ where: { invoice: { familyId } }, orderBy: { date: "asc" } }),
     client.invoice.findMany({ where: { familyId }, include: { payments: true } }),

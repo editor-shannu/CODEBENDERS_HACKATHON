@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { addDays, fromKey, monthKey, todayIST, toKey } from "@/lib/dates";
 import { sumPaid } from "@/lib/invoice-status";
-import { seedDemo } from "@/lib/seed-data";
+import { currentUserId } from "@/lib/auth/session";
+import { rawDb } from "@/lib/prisma";
 import { settlePlanForBill, settlePlanForPayment } from "@/lib/munshi/plan";
 import { createInvoiceFor, recalcInvoice } from "@/lib/invoices";
 import { learnFromHistory, learnFromReply } from "@/lib/munshi/memory";
@@ -125,7 +126,8 @@ export async function updateFamily(input: { id: string; parentName: string; lang
 export async function saveSettings(input: Record<string, unknown>): Promise<ActionResult> {
   const parsed = settingsSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the details" };
-  await db.settings.upsert({ where: { id: 1 }, update: parsed.data, create: { id: 1, ...parsed.data } });
+  const userId = await currentUserId();
+  await db.settings.upsert({ where: { userId }, update: parsed.data, create: { userId, ...parsed.data } });
   refreshAll();
   return { ok: true, message: "Settings saved" };
 }
@@ -160,19 +162,18 @@ export async function deleteKeyDate(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
-export async function resetDemo(): Promise<ActionResult> {
-  await seedDemo(db);
-  refreshAll();
-  return { ok: true, message: "Demo data reset to today" };
-}
-
 /* ---------- Parent Pay Link ---------- */
 export async function submitClaim(input: { token: string; amount: number; reference: string }): Promise<ActionResult> {
   const parsed = claimSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the details" };
-  const inv = await db.invoice.findUnique({ where: { payToken: parsed.data.token } });
+  // Public (parents are not signed in): the unscoped client, pinned to the invoice's own tutor.
+  const inv = await rawDb.invoice.findUnique({ where: { payToken: parsed.data.token }, include: { payments: true, claims: { where: { status: "PENDING" } } } });
   if (!inv || inv.status === "DRAFT") return { ok: false, error: "This payment link is not valid" };
-  await db.paymentClaim.create({ data: { invoiceId: inv.id, amount: parsed.data.amount, reference: parsed.data.reference } });
+  if (inv.claims.length >= 5) return { ok: false, error: "A payment is already waiting for the teacher to confirm" };
+  const balance = inv.amount - sumPaid(inv.payments);
+  if (balance <= 0) return { ok: false, error: "This fee is already paid" };
+  if (parsed.data.amount > balance) return { ok: false, error: "That's more than the fee due" };
+  await rawDb.paymentClaim.create({ data: { userId: inv.userId, invoiceId: inv.id, amount: parsed.data.amount, reference: parsed.data.reference } });
   refreshAll();
   return { ok: true, message: "Thank you! The teacher will confirm shortly." };
 }

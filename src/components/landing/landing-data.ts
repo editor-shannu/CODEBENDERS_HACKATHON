@@ -19,6 +19,7 @@ export type LandingData = {
   rent: { name: string; amount: number; dueDay: number; daysUntil: number; atRisk: boolean } | null;
   munshiNote: string;
   defense: string[]; // ids of up to three owing houses Munshi chases to keep rent safe
+  viewer: { name: string } | null; // the signed-in tutor, or null for visitors
 };
 
 export const MAX_HOUSES = 12;
@@ -26,6 +27,7 @@ export const MAX_HOUSES = 12;
 /** Static demo lane, used whenever the database is empty or unreachable so the landing never breaks. */
 export const DEMO_LANDING: LandingData = {
   source: "demo",
+  viewer: null,
   centre: "Lakshmi Teaching Point",
   tutor: "Lakshmi Devi",
   families: [

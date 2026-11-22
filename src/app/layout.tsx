@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Courier_Prime, Hind, Hind_Guntur, Rozha_One } from "next/font/google";
 import BottomNav from "@/components/nav/BottomNav";
 import { Main, TutorOnly } from "@/components/nav/TutorOnly";
+import { FirebaseAnalytics, SignOutButton } from "@/components/auth/GoogleSignIn";
 import { getSettings } from "@/lib/data";
 import { formatDate, todayIST } from "@/lib/dates";
 import "./globals.css";
@@ -31,6 +32,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" className={`${rozha.variable} ${courier.variable} ${hind.variable} ${telugu.variable}`}>
       <body className="flex min-h-dvh flex-col">
+        <FirebaseAnalytics />
         <TutorOnly>
         <header className="board border-b-4 border-brick bg-dusk-deep px-4 py-3 text-plaster">
           <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3">
@@ -43,6 +45,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/settings" className="font-mono text-[11px] uppercase tracking-[0.14em] text-plaster/70 hover:text-lamp">
                 Settings
               </Link>
+              <SignOutButton className="font-mono text-[11px] uppercase tracking-[0.14em] text-plaster/70 hover:text-lamp" />
             </div>
           </div>
         </header>
@@ -50,7 +53,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Main>{children}</Main>
         <TutorOnly>
         <footer className="px-4 pb-4 text-center font-mono text-[11px] text-slate-mute">
-          {settings.centreName} · Demo data (synthetic) · Built with Codebenders
+          {settings.centreName} · Built with Codebenders
         </footer>
         <div className="h-24" aria-hidden="true" />
         <BottomNav />
