@@ -7,7 +7,7 @@ import { addDays, dateInMonth, fromKey, monthKey, todayIST, toKey } from "@/lib/
 import { familyMonthlyFee } from "@/lib/family-stats";
 import { computeStatus, sumPaid } from "@/lib/invoice-status";
 import { seedDemo } from "@/lib/seed-data";
-import { billSchema, claimSchema, paymentSchema, phoneSchema, promiseSchema, settingsSchema, studentSchema } from "@/lib/validators";
+import { billSchema, claimSchema, paymentSchema, promiseSchema, settingsSchema, studentSchema } from "@/lib/validators";
 
 export type ActionResult = { ok: true; message?: string; status?: string } | { ok: false; error: string };
 
@@ -102,9 +102,7 @@ export async function saveStudent(input: Record<string, unknown> & { id?: string
   let familyId = d.familyId;
   if (!familyId) {
     if (!d.parentName || d.parentName.length < 2) return { ok: false, error: "Add the parent's name" };
-    const phone = phoneSchema.safeParse(d.phone ?? "");
-    if (!phone.success) return { ok: false, error: phone.error.issues[0]?.message ?? "Check the phone number" };
-    const fam = await db.family.create({ data: { parentName: d.parentName, phone: phone.data, language: d.language ?? "te" } });
+    const fam = await db.family.create({ data: { parentName: d.parentName, language: d.language ?? "te" } });
     familyId = fam.id;
   }
   await db.student.create({ data: { familyId, name: d.name, batch: d.batch, monthlyFee: d.monthlyFee, dueDay: d.dueDay } });
@@ -118,10 +116,9 @@ export async function setStudentActive(id: string, active: boolean): Promise<Act
   return { ok: true };
 }
 
-export async function updateFamily(input: { id: string; parentName: string; phone: string; language: string; notes: string }): Promise<ActionResult> {
-  const phone = phoneSchema.safeParse(input.phone);
-  if (!phone.success) return { ok: false, error: phone.error.issues[0]?.message ?? "Check the phone" };
-  await db.family.update({ where: { id: input.id }, data: { parentName: input.parentName, phone: phone.data, language: input.language, notes: input.notes } });
+export async function updateFamily(input: { id: string; parentName: string; language: string; notes: string }): Promise<ActionResult> {
+  if (!input.parentName || input.parentName.trim().length < 2) return { ok: false, error: "Add the parent's name" };
+  await db.family.update({ where: { id: input.id }, data: { parentName: input.parentName.trim(), language: input.language, notes: input.notes } });
   refreshAll();
   return { ok: true, message: "Saved" };
 }
@@ -205,4 +202,66 @@ export async function applyDueDate(familyId: string, dueDay: number, reason = ""
   await db.agentAction.create({ data: { type: "DUE_DATE", familyId, title: `Due date moved to day ${dueDay}`, reason, status: "DONE", source: "RULES" } });
   refreshAll();
   return { ok: true, message: `Due date moved to the ${dueDay}` };
+}
+
+export async function deferBill(billId: string, days: number, reason = ""): Promise<ActionResult> {
+  const bill = await db.bill.findUnique({ where: { id: billId } });
+  if (!bill) return { ok: false, error: "Bill not found" };
+  await db.bill.update({ where: { id: billId }, data: { deferDays: Math.max(0, Math.min(20, days)) } });
+  await db.agentAction.create({ data: { type: "DEFER_BILL", title: `Pushed "${bill.name}" by ${days} days`, reason, status: "DONE", source: "RULES" } });
+  refreshAll();
+  return { ok: true, message: `${bill.name} pushed by ${days} days` };
+}
+
+export async function logAgentAction(input: { type: string; title: string; detail?: string; reason?: string; familyId?: string; status?: string; source?: string }): Promise<ActionResult> {
+  await db.agentAction.create({
+    data: { type: input.type, title: input.title, detail: input.detail ?? "", reason: input.reason ?? "", familyId: input.familyId ?? null, status: input.status ?? "DONE", source: input.source ?? "RULES" },
+  });
+  refreshAll();
+  return { ok: true };
+}
+
+export async function setActionStatus(id: string, status: "APPROVED" | "DONE" | "SKIPPED"): Promise<ActionResult> {
+  await db.agentAction.update({ where: { id }, data: { status } });
+  refreshAll();
+  return { ok: true };
+}
+
+export async function readReplyAction(familyId: string, text: string) {
+  const { parseReply } = await import("@/lib/munshi/agent");
+  const { familyStats } = await import("@/lib/family-stats");
+  const f = await db.family.findUnique({
+    where: { id: familyId },
+    include: { students: true, invoices: { include: { payments: true } }, promises: true, reminders: true },
+  });
+  if (!f || !text.trim()) return { ok: false as const, error: "Pick a family and paste their reply" };
+  const today = todayIST();
+  const balance = familyStats(f, today).balance;
+  const r = await parseReply(text.trim(), today, balance, f.parentName);
+  await db.agentAction.create({ data: { type: "NOTE", familyId, title: `Read reply from ${f.parentName}`, detail: text.slice(0, 200), reason: r.summary, status: "DONE", source: r.source } });
+  refreshAll();
+  return { ok: true as const, result: r, balance };
+}
+
+export async function askMunshiAction(question: string) {
+  if (!question.trim()) return { ok: false as const, error: "Ask a question" };
+  const { askMunshi } = await import("@/lib/munshi/agent");
+  const { loadDashboard } = await import("@/lib/board-view");
+  const { board, forecast } = await loadDashboard();
+  const r = await askMunshi(question.trim().slice(0, 500), { families: board.families, forecast, totalPending: board.totalPending, today: board.today });
+  return { ok: true as const, ...r };
+}
+
+export async function createPlanFromSteps(input: { title: string; goal: string; steps: { type: string; familyId?: string; title: string; detail: string; reason: string; payload: Record<string, unknown> }[] }): Promise<ActionResult> {
+  await db.agentPlan.updateMany({ where: { status: { in: ["PROPOSED", "ACTIVE"] } }, data: { status: "DISMISSED" } });
+  await db.agentPlan.create({
+    data: {
+      title: input.title,
+      goal: input.goal,
+      status: "PROPOSED",
+      actions: { create: input.steps.map((s, i) => ({ type: s.type, familyId: s.familyId ?? null, title: s.title, detail: s.detail, reason: s.reason, payload: JSON.stringify(s.payload), step: i + 1 })) },
+    },
+  });
+  refreshAll();
+  return { ok: true, message: "Plan sent to your approval inbox" };
 }

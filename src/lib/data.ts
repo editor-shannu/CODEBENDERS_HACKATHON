@@ -94,7 +94,6 @@ export function buildForecastInput(board: Awaited<ReturnType<typeof loadBoard>>)
 
 export type ReminderPayload = {
   familyId: string;
-  phone: string;
   language: string;
   parent: string;
   kids: string;
@@ -114,7 +113,6 @@ export function reminderPayload(f: FamilyWithStats, settings: { centreName: stri
   const kids = kidsLabel(f.students.map((s) => s.name));
   return {
     familyId: f.id,
-    phone: f.phone,
     language: f.language,
     parent: f.parentName.split(" ")[0],
     kids,

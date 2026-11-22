@@ -42,8 +42,9 @@ export function discountOfferText(language: string, v: { parent: string; kids: s
   return `Namaste ${v.parent} garu, pay ${v.kids}'s ${v.month} fee by ${v.by} and get ${v.discount} off. Just ${v.amount} to pay: ${v.link}\n– ${v.tutor}`;
 }
 
-export function waLink(phone: string, text: string): string {
-  return `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;
+/** Opens WhatsApp with the message ready; the tutor picks the parent's chat. No phone number is ever used. */
+export function waLink(text: string): string {
+  return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
 
 export function kidsLabel(names: string[]): string {

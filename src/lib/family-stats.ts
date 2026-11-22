@@ -17,7 +17,6 @@ export type InvoiceLite = {
 export type FamilyLite = {
   id: string;
   parentName: string;
-  phone: string;
   language: string;
   notes: string;
   memory: string;

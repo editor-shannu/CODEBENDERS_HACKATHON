@@ -40,7 +40,7 @@ export function RemindSheet({ p, open, onClose, onSent }: { p: ReminderPayload; 
   const text = reminderText(lang, tone, { parent: p.parent, kids: p.kids, centre: p.centre, tutor: p.tutor, amount: p.amount, months: p.months, days: p.days, by: p.by, link });
 
   const send = () => {
-    window.open(waLink(p.phone, text), "_blank", "noopener");
+    window.open(waLink(text), "_blank", "noopener");
     start(async () => {
       await logReminder(p.familyId, tone, lang);
       onClose();
@@ -80,7 +80,7 @@ export function RemindSheet({ p, open, onClose, onSent }: { p: ReminderPayload; 
         <Button className="w-full" onClick={send} disabled={pending}>
           {pending ? "Opening…" : "Open WhatsApp"}
         </Button>
-        <p className="mt-2 text-center font-mono text-[11px] text-ink/50">Sends from your own WhatsApp to {p.phone}</p>
+        <p className="mt-2 text-center font-mono text-[11px] text-ink/50">Opens WhatsApp with this message ready. Pick {p.parent}&apos;s chat and tap send.</p>
       </Sheet>
   );
 }
