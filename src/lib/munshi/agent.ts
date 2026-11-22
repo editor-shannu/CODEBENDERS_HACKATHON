@@ -7,7 +7,7 @@ import type { Tone } from "../family-stats";
 import { reminderText, waLink } from "../messages";
 import { memoryOf, ordinal } from "./rules";
 import { proposeOrRun, type WriteType } from "./execute";
-import { allowedAmounts, checkAmounts } from "./guardrails";
+import { allowedAmounts, checkAmounts, isThreatening, numbersIn } from "./guardrails";
 
 /* ------------------------------------------------------------------ */
 /* Reply Reader: turns a parent's WhatsApp reply into a payment promise */
@@ -111,7 +111,7 @@ export async function parseReply(text: string, today: Date, balance: number, par
       [
         {
           role: "system",
-          content: `You read WhatsApp replies from Indian parents about tuition fees. Replies may be English, Telugu, Hindi, or romanised Tenglish/Hinglish. Today is ${toKey(today)} (${formatDate(today)}). The family owes ${balance} rupees. Return JSON: {"promisedDate":"YYYY-MM-DD"|null,"amount":number|null,"confidence":"high"|"medium"|"low","summary":"one short English sentence"}.`,
+          content: `You read WhatsApp replies from Indian parents about tuition fees. Replies may be English, Telugu, Hindi, or romanised Tenglish/Hinglish. Today is ${toKey(today)} (${formatDate(today)}). The family owes ${balance} rupees. Only report a date or amount the parent actually said; never invent one. Return JSON: {"promisedDate":"YYYY-MM-DD"|null,"amount":number|null,"confidence":"high"|"medium"|"low","summary":"one short English sentence"}.`,
         },
         { role: "user", content: `Reply from ${parent}: ${text}` },
       ],
@@ -240,6 +240,7 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx, so
       const link = p.token ? `${ctx.origin}/pay/${p.token}` : ctx.origin;
       const raw = reminderText(f.language, tone, { parent: p.parent, kids: p.kids, centre: p.centre, tutor: p.tutor, amount: p.amount, months: p.months, days: p.days, by: p.by, link });
       const text = checkAmounts(raw, allowedAmounts(f));
+      if (isThreatening(text)) return { result: { error: "Draft blocked by guardrail" } };
       const r = await write("REMIND", f.id, `Send a ${tone.toLowerCase()} reminder to ${f.parentName}`, { tone, language: f.language }, "Drafted by Munshi. Munshi never sends: you open WhatsApp and pick the chat.");
       return { result: { draft: text, whatsapp: waLink(text), language: f.language, sent: false, ...r }, action: { title: `Reminder draft for ${f.parentName}`, status: r.status } };
     }
@@ -412,6 +413,7 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
   const trace: TraceStep[] = [];
   let chart: ChartData | undefined;
   const actions: { title: string; status: string }[] = [];
+  const results: unknown[] = [];
   const messages: Msg[] = [
     { role: "system", content: munshiSystemPrompt(ctx) },
     { role: "user", content: question },
@@ -429,11 +431,24 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
           if (out.chart) chart = out.chart;
           if (out.action) actions.push(out.action);
           trace.push({ kind: "result", text: JSON.stringify(out.result).slice(0, 300) });
+          results.push(out.result);
           messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(out.result) });
         }
         continue;
       }
-      const answer = msg.content?.trim() || "I couldn't work that out.";
+      let answer = msg.content?.trim() || "I couldn't work that out.";
+      // Guardrails: rupee amounts must come from tool results; threats or shaming are never shown.
+      const checked = checkAmounts(answer, numbersIn(results));
+      if (checked !== answer) trace.push({ kind: "think", text: "Guardrail: dropped an amount that no tool returned." });
+      answer = checked;
+      if (isThreatening(answer)) {
+        trace.push({ kind: "think", text: "Guardrail: the AI answer used threatening or shaming words, switched to offline rules." });
+        if (!actions.length) {
+          const r = await rulesAnswer(question, ctx);
+          return { ...r, trace: [...trace, ...r.trace] };
+        }
+        answer = `Done: ${actions.map((a) => `${a.title} (${a.status})`).join("; ")}.`;
+      }
       trace.push({ kind: "answer", text: answer });
       return { answer, trace, source: "AI", chart, actions };
     }

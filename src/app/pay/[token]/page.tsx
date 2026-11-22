@@ -21,7 +21,7 @@ export default async function PayPage({ params }: { params: Promise<{ token: str
   return (
     <Guard>
       {async () => {
-        const inv = await db.invoice.findUnique({ where: { payToken: token }, include: { family: { include: { students: true } }, payments: true, claims: { where: { status: "PENDING" } } } });
+        const inv = await db.invoice.findUnique({ where: { payToken: token }, include: { family: { select: { parentName: true, students: { where: { active: true }, select: { name: true } } } }, payments: true, claims: { where: { status: "PENDING" } } } });
         if (!inv) notFound();
         const settings = await getSettings();
         const bal = balanceOf(inv);
