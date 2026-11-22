@@ -81,4 +81,4 @@ Baaki is open source. Issues and pull requests are welcome: fork the repo, creat
 
 Released under the [MIT License](LICENSE).
 
-Built by team Codebenders for the Codebenders Hackathon, 2026.
+Built using Codebenders for the Codebenders Hackathon, 2026.
