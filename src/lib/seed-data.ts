@@ -4,7 +4,7 @@ import { addDays, addMonths, dateInMonth, fromKey, monthKey, monthStart, todayIS
 import { familyMonthlyFee } from "./family-stats";
 
 /**
- * Synthetic demo data for "Lakshmi Teaching Point", Vizianagaram.
+ * Synthetic demo data for "Lakshmi Teaching Point", Hyderabad.
  * Everything is generated relative to TODAY in IST, so the story stays true whenever it is reset:
  * about ₹14,500 pending, days late from ~6 to ~47, two families with two broken promises each.
  */
@@ -91,7 +91,7 @@ export async function seedDemo(db: PrismaClient, now: Date = new Date()) {
       id: 1,
       tutorName: "Lakshmi Devi",
       centreName: "Lakshmi Teaching Point",
-      city: "Vizianagaram",
+      city: "Hyderabad",
       upiId: "lakshmi.tuition@okaxis",
       upiName: "Lakshmi Teaching Point",
       startingBalance: 10500,

@@ -3,82 +3,110 @@
 import { useFrame } from "@react-three/fiber";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { archedWall, FACADE, minaretProfile } from "./oldcity";
 import type { StageControl } from "../LaneStage";
 import { nightAt } from "./Rig";
 import { HOUSE_GAP } from "./Lane";
 
-/** Charminar as a hazy silhouette on the far skyline; its arches light up on rent day. */
+/**
+ * Charminar (1591): a 20 m square of four great pointed arches, an arcaded upper gallery and a
+ * mosque storey, with four 56 m minarets, each ringed by two balconies and capped by a bulbous dome.
+ * Built here at its real proportions from extruded arch shapes and lathed minarets.
+ */
 export function Charminar({ control }: { control: StageControl }) {
   const glow = useRef<THREE.MeshStandardMaterial>(null);
+  const lamps = useRef<THREE.MeshStandardMaterial>(null);
   useFrame(() => {
-    if (glow.current) glow.current.emissiveIntensity = nightAt(control.progress.current) * 2.2;
+    const n = nightAt(control.progress.current);
+    if (glow.current) glow.current.emissiveIntensity = n * 2.4;
+    if (lamps.current) lamps.current.emissiveIntensity = n * 3.5;
   });
-  const stone = <meshStandardMaterial color="#b9a58a" roughness={1} />;
-  const minaret = (x: number, z: number) => (
-    <group key={`${x}${z}`} position={[x, 0, z]}>
-      <mesh position={[0, 28, 0]}>
-        <cylinderGeometry args={[1.5, 1.9, 56, 12]} />
-        {stone}
-      </mesh>
-      {[20, 34, 46].map((y) => (
-        <mesh key={y} position={[0, y, 0]}>
-          <cylinderGeometry args={[2.4, 2.4, 0.8, 12]} />
-          {stone}
-        </mesh>
-      ))}
-      <mesh position={[0, 57.5, 0]}>
-        <sphereGeometry args={[1.8, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        {stone}
-      </mesh>
-    </group>
-  );
+  const geo = useMemo(() => {
+    const face = archedWall(20, 21, 2.2, [{ cx: 0, y: 0, w: 11, h: 18.5 }]);
+    const arcade = archedWall(20, 5, 1.2, Array.from({ length: 7 }, (_, k) => ({ cx: -7.8 + k * 2.6, y: 0.6, w: 1.7, h: 3.6 })));
+    const minaret = new THREE.LatheGeometry(minaretProfile(1), 14);
+    const dome = new THREE.LatheGeometry(
+      [[0, 0], [2.4, 0], [2.8, 0.8], [2.6, 2], [1.6, 3.2], [0.5, 3.9], [0.1, 4.6], [0, 4.8]].map(([x, y]) => new THREE.Vector2(x, y)),
+      14,
+    );
+    return { face, arcade, minaret, dome };
+  }, []);
+  const stone = useMemo(() => new THREE.MeshStandardMaterial({ color: "#cdbb98", roughness: 0.95 }), []);
+  const sides = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
   return (
-    <group position={[26, 0, -105]} rotation={[0, -0.3, 0]}>
-      <mesh position={[0, 12, 0]}>
-        <boxGeometry args={[26, 24, 26]} />
-        {stone}
+    <group position={[22, 0, -95]} rotation={[0, -0.35, 0]} scale={1.05}>
+      {/* four arched faces and the glowing inner vault */}
+      {sides.map((r) => (
+        <group key={r} rotation={[0, r, 0]}>
+          <mesh geometry={geo.face} material={stone} position={[0, 0, 10]} />
+          <mesh geometry={geo.arcade} material={stone} position={[0, 23.5, 10]} />
+          <mesh position={[0, 21.7, 10.6]} material={stone}>
+            <boxGeometry args={[21, 1.4, 1.6]} />
+          </mesh>
+        </group>
+      ))}
+      <mesh position={[0, 9, 0]}>
+        <boxGeometry args={[17.6, 18, 17.6]} />
+        <meshStandardMaterial ref={glow} color="#2a231b" emissive="#ffc27a" emissiveIntensity={0} roughness={1} toneMapped={false} side={THREE.BackSide} />
       </mesh>
-      <mesh position={[0, 26, 0]}>
-        <boxGeometry args={[24, 4, 24]} />
-        {stone}
+      <mesh position={[0, 20.5, 0]} material={stone}>
+        <boxGeometry args={[19, 1.5, 19]} />
       </mesh>
-      <mesh position={[0, 9, 13.05]}>
-        <planeGeometry args={[10, 15]} />
-        <meshStandardMaterial ref={glow} color="#2b2620" emissive="#ffc27a" emissiveIntensity={0} toneMapped={false} />
+      <mesh position={[0, 26, 0]} material={stone}>
+        <boxGeometry args={[20.5, 1, 20.5]} />
       </mesh>
-      {minaret(-13, -13)}
-      {minaret(13, -13)}
-      {minaret(-13, 13)}
-      {minaret(13, 13)}
+      {/* the mosque storey on top, set back */}
+      <mesh position={[0, 28.5, -3]} material={stone}>
+        <boxGeometry args={[14, 4, 8]} />
+      </mesh>
+      {/* minarets at the four corners */}
+      {[[-10, -10], [10, -10], [-10, 10], [10, 10]].map(([x, z]) => (
+        <group key={`${x}${z}`} position={[x, 0, z]}>
+          <mesh geometry={geo.minaret} material={stone} />
+          <mesh position={[0, 21.3, 0]}>
+            <torusGeometry args={[2.5, 0.08, 4, 20]} />
+            <meshStandardMaterial ref={x === -10 && z === -10 ? lamps : undefined} color="#3a3026" emissive="#ffd08a" emissiveIntensity={0} toneMapped={false} />
+          </mesh>
+        </group>
+      ))}
+      {/* small domes over the mosque storey */}
+      {[-4.5, 4.5].map((x) => (
+        <mesh key={x} geometry={geo.dome} material={stone} position={[x, 30.5, -3]} scale={0.55} />
+      ))}
     </group>
   );
 }
 
-/** Low-rise Hyderabad around the lane, seen from above on Day 1. */
 export function CityBlocks() {
   const ref = useRef<THREE.InstancedMesh>(null);
   const count = 420;
   const data = useMemo(() => {
     const rnd = mulberry(7);
     const out: { x: number; z: number; w: number; h: number; d: number; c: THREE.Color }[] = [];
-    const tints = ["#d9c7b0", "#cbb79a", "#e3d2b5", "#b7a58c", "#c9c2b2", "#d8bfa0"];
+    const tints = [...FACADE, "#d9c7b0", "#cbb79a", "#e3d2b5"];
     while (out.length < count) {
       const x = (rnd() - 0.5) * 260;
       const z = -150 + rnd() * 170;
       if (Math.abs(z + 2) < 11 && Math.abs(x) < 50) continue; // keep the lane clear
+      if (z > -16 && Math.abs(x) < 70) continue; // and the camera's foreground
       if (Math.hypot(x - 26, z + 105) < 30) continue; // and Charminar's square
-      const h = 3 + rnd() * rnd() * 14;
+      const h = 4 + Math.floor(rnd() * 3) * 2.6 + rnd() * rnd() * 4; // two to four storeys, the odd taller block
       out.push({ x, z, w: 3 + rnd() * 5, h, d: 3 + rnd() * 5, c: new THREE.Color(tints[Math.floor(rnd() * tints.length)]) });
     }
     return out;
   }, []);
+  const tanks = useRef<THREE.InstancedMesh>(null);
   useLayoutEffect(() => {
     const m = new THREE.Matrix4();
     data.forEach((b, i) => {
       m.compose(new THREE.Vector3(b.x, b.h / 2, b.z), new THREE.Quaternion(), new THREE.Vector3(b.w, b.h, b.d));
       ref.current?.setMatrixAt(i, m);
       ref.current?.setColorAt(i, b.c);
+      // the black plastic water tank on nearly every terrace
+      m.compose(new THREE.Vector3(b.x + b.w * 0.25, b.h + 0.5, b.z - b.d * 0.2), new THREE.Quaternion(), new THREE.Vector3(1, 1, 1));
+      tanks.current?.setMatrixAt(i, m);
     });
+    if (tanks.current) tanks.current.instanceMatrix.needsUpdate = true;
     if (ref.current) {
       ref.current.instanceMatrix.needsUpdate = true;
       if (ref.current.instanceColor) ref.current.instanceColor.needsUpdate = true;
@@ -93,6 +121,10 @@ export function CityBlocks() {
       <instancedMesh ref={ref} args={[undefined, undefined, count]}>
         <boxGeometry />
         <meshStandardMaterial roughness={1} />
+      </instancedMesh>
+      <instancedMesh ref={tanks} args={[undefined, undefined, count]}>
+        <cylinderGeometry args={[0.55, 0.55, 1, 10]} />
+        <meshStandardMaterial color="#141518" roughness={0.6} />
       </instancedMesh>
     </>
   );

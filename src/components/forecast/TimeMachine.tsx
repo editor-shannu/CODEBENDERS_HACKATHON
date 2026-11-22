@@ -30,7 +30,7 @@ export function TimeMachine({ input, month }: { input: ForecastInput; month: str
   const slider = (label: string, value: number, set: (n: number) => void, min: number, max: number, step: number, fmt: (n: number) => string) => (
     <div>
       <div className="flex justify-between"><span className={labelClass}>{label}</span><span className="font-mono text-xs">{fmt(value)}</span></div>
-      <input type="range" className="w-full accent-[#B3262D]" min={min} max={max} step={step} value={value} onChange={(e) => set(Number(e.target.value))} />
+      <input type="range" className="w-full accent-[#b3302b]" min={min} max={max} step={step} value={value} onChange={(e) => set(Number(e.target.value))} />
     </div>
   );
 

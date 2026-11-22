@@ -17,7 +17,7 @@ export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="no-print fixed inset-x-0 bottom-0 z-50 border-t border-plaster/20 bg-dusk pb-[env(safe-area-inset-bottom)]">
+    <nav className="no-print fixed inset-x-0 bottom-0 z-50 board border-t-4 border-brick bg-dusk-deep pb-[env(safe-area-inset-bottom)]">
       <ul className="mx-auto flex w-full max-w-5xl justify-around">
         {LINKS.map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href);

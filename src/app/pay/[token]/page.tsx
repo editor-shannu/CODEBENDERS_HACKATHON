@@ -27,7 +27,7 @@ export default async function PayPage({ params }: { params: Promise<{ token: str
         const bal = balanceOf(inv);
         const kids = inv.family.students.filter(() => true).map((s) => s.name.split(" ")[0]).join(", ");
         const upi = upiLink({ vpa: settings.upiId, name: settings.upiName, amount: bal, note: `${inv.number} ${kids}` });
-        const qr = bal > 0 ? await QRCode.toDataURL(upi, { margin: 1, width: 260, color: { dark: "#0E0E0E", light: "#F3EAD7" } }) : null;
+        const qr = bal > 0 ? await QRCode.toDataURL(upi, { margin: 1, width: 260, color: { dark: "#1b2444", light: "#fbf6ea" } }) : null;
         return (
           <div className="mx-auto max-w-md">
             <p className="mb-4 text-center font-display text-2xl italic text-lamp">{settings.centreName}</p>

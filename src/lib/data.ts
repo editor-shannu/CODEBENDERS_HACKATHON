@@ -16,7 +16,7 @@ export async function getSettings() {
       id: 1,
       tutorName: "Lakshmi Devi",
       centreName: "Lakshmi Teaching Point",
-      city: "Vizianagaram",
+      city: "Hyderabad",
       upiId: "lakshmi.tuition@okaxis",
       upiName: "Lakshmi Teaching Point",
       startingBalance: 0,

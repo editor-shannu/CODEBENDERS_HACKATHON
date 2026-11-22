@@ -50,7 +50,7 @@ export function ChaseQueue({ cards }: { cards: QueueCard[] }) {
 
   return (
     <div>
-      <div className="relative h-[230px]">
+      <div className="relative h-[250px]">
         {queue.slice(1, 3).map((c, i) => (
           <div key={c.familyId} className="ruled-paper absolute inset-0 border border-dusk-deep/15" style={{ transform: `translateY(${(i + 1) * 8}px) scale(${1 - (i + 1) * 0.03})`, opacity: 0.6 - i * 0.2 }} />
         ))}
@@ -65,7 +65,7 @@ export function ChaseQueue({ cards }: { cards: QueueCard[] }) {
           {dx > 40 && <span className="absolute right-4 top-4 -rotate-6 border-2 border-lamp px-2 font-mono text-xs font-bold tracking-widest text-lamp">REMIND</span>}
           {dx < -40 && <span className="absolute left-14 top-4 rotate-6 border-2 border-dusk-deep/50 px-2 font-mono text-xs font-bold tracking-widest text-dusk-deep/60">SNOOZE</span>}
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-dusk-deep/60">Chase score {top.chaseScore} · {queue.length} in queue</p>
-          <Link href={`/families/${top.familyId}`} className="mt-1 flex items-center gap-3 font-display text-3xl leading-tight"><HouseStatus status={top.status} size={36} />{top.parent}</Link>
+          <Link href={`/families/${top.familyId}`} className="mt-1 flex min-w-0 items-center gap-3 font-display text-3xl leading-tight"><HouseStatus status={top.status} size={36} /><span className="truncate">{top.parent}</span></Link>
           <p className="text-sm text-dusk-deep/70">for {top.kids}</p>
           <p className="big-number mt-3 text-5xl text-brick">{top.amount}</p>
           <p className="mt-2 font-mono text-xs">

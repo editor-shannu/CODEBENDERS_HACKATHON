@@ -5,7 +5,8 @@ import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { LandingData, LandingFamily } from "../landing-data";
 import type { StageControl } from "../LaneStage";
-import { PLASTER_TINTS, useLaneTextures } from "./materials";
+import { useLaneTextures } from "./materials";
+import { archShape, FACADE, SHOPS, shutterTexture, signTexture } from "./oldcity";
 
 export const HOUSE_GAP = 3.4;
 export const LANE_Z = -4;
@@ -33,10 +34,12 @@ export function litAt(p: number, f: LandingFamily, order: { paid: number; paidCo
 
 function House({ f, i, data, control, tex }: { f: LandingFamily; i: number; data: LandingData; control: StageControl; tex: ReturnType<typeof useLaneTextures> }) {
   const floors = 2 + ((i * 7) % 3 === 0 ? 1 : 0);
-  const w = 2.7;
-  const h = floors * 2.1;
+  const w = 2.9;
+  const fh = 2.15;
+  const h = floors * fh;
   const d = 2.6;
-  const tint = PLASTER_TINTS[i % PLASTER_TINTS.length];
+  const paint = FACADE[i % FACADE.length];
+  const shop = SHOPS[i % SHOPS.length];
   const win = useRef<THREE.MeshStandardMaterial>(null);
   const glow = useRef<THREE.PointLight>(null);
   const paidOrder = data.families.filter((x) => x.status === "paid").indexOf(f);
@@ -51,68 +54,120 @@ function House({ f, i, data, control, tex }: { f: LandingFamily; i: number; data
     if (glow.current) glow.current.intensity = lit * 2.2;
   });
 
-  const wallMat = useMemo(() => {
-    const m = new THREE.MeshStandardMaterial({ map: tex.plaster, normalMap: tex.plasterN, color: tint, roughness: 0.95 });
-    return m;
-  }, [tex, tint]);
+  const parts = useMemo(() => {
+    const wall = new THREE.MeshStandardMaterial({ map: tex.plaster, normalMap: tex.plasterN, color: paint, roughness: 0.95 });
+    const sign = signTexture(
+      [
+        { text: shop.te, font: "600 54px TELUGU", y: 0.36 },
+        { text: shop.en.toUpperCase(), font: "700 44px Georgia, serif", y: 0.74 },
+      ],
+      shop.bg,
+      "#f6eedb",
+    );
+    const shutter = shutterTexture(i % 2 ? "#6f7a83" : "#8a6a3c");
+    const arch = new THREE.ShapeGeometry(archShape(0.95, 1.25), 8);
+    return { wall, sign, shutter, arch };
+  }, [tex, paint, shop, i]);
 
   return (
     <group position={[houseX(i), 0, LANE_Z - (i % 3) * 0.4]}>
-      <mesh position={[0, h / 2, 0]} castShadow receiveShadow material={wallMat}>
+      <mesh position={[0, h / 2, 0]} castShadow receiveShadow material={parts.wall}>
         <boxGeometry args={[w, h, d]} />
       </mesh>
-      {/* floor bands and a balcony with an iron grill on the first floor */}
+      {/* ground floor: a shop with a rolling shutter half up and a painted signboard */}
+      <mesh position={[0, 0.95, d / 2 + 0.01]}>
+        <planeGeometry args={[w * 0.82, 1.9]} />
+        <meshStandardMaterial map={parts.shutter} roughness={0.7} metalness={0.3} />
+      </mesh>
+      <mesh position={[0, 0.35, d / 2 + 0.015]}>
+        <planeGeometry args={[w * 0.82, 0.7]} />
+        <meshStandardMaterial color="#2a1d12" emissive="#ffb35c" emissiveIntensity={0.25} roughness={0.9} />
+      </mesh>
+      <mesh position={[0, 2.0, d / 2 + 0.08]}>
+        <planeGeometry args={[w * 0.96, 0.42]} />
+        <meshStandardMaterial map={parts.sign} roughness={0.85} />
+      </mesh>
+      {/* chajja sunshades over each upper floor, and the slab line */}
       {Array.from({ length: floors - 1 }).map((_, k) => (
-        <mesh key={k} position={[0, 2.1 * (k + 1), d / 2 + 0.05]} castShadow>
-          <boxGeometry args={[w + 0.1, 0.12, 0.2]} />
-          <meshStandardMaterial color="#b9a88f" roughness={1} />
-        </mesh>
+        <group key={k}>
+          <mesh position={[0, fh * (k + 1) + 0.25, d / 2 + 0.3]} rotation={[0.12, 0, 0]} castShadow>
+            <boxGeometry args={[w + 0.15, 0.08, 0.6]} />
+            <meshStandardMaterial color="#9c9286" roughness={1} />
+          </mesh>
+          <mesh position={[0, fh * (k + 2) - 0.25, d / 2 + 0.22]} castShadow>
+            <boxGeometry args={[w * 0.75, 0.06, 0.45]} />
+            <meshStandardMaterial color="#8f877c" roughness={1} />
+          </mesh>
+        </group>
       ))}
-      <group position={[0, 2.1, d / 2 + 0.45]}>
+      {/* first-floor balcony with a wrought-iron grill and a tulsi pot */}
+      <group position={[0, fh + 0.3, d / 2 + 0.45]}>
         <mesh castShadow>
           <boxGeometry args={[w * 0.8, 0.1, 0.9]} />
-          <meshStandardMaterial color="#a89880" roughness={1} />
+          <meshStandardMaterial color="#a2978a" roughness={1} />
         </mesh>
-        {Array.from({ length: 9 }).map((_, k) => (
-          <mesh key={k} position={[-w * 0.38 + (k * w * 0.76) / 8, 0.45, 0.42]}>
-            <boxGeometry args={[0.03, 0.8, 0.03]} />
-            <meshStandardMaterial color="#1f2328" metalness={0.6} roughness={0.5} />
+        {Array.from({ length: 11 }).map((_, k) => (
+          <mesh key={k} position={[-w * 0.38 + (k * w * 0.76) / 10, 0.45, 0.42]}>
+            <boxGeometry args={[0.025, 0.8, 0.025]} />
+            <meshStandardMaterial color="#20262b" metalness={0.6} roughness={0.5} />
           </mesh>
         ))}
-        <mesh position={[0, 0.85, 0.42]}>
-          <boxGeometry args={[w * 0.8, 0.05, 0.05]} />
-          <meshStandardMaterial color="#1f2328" metalness={0.6} roughness={0.5} />
-        </mesh>
-        {/* potted tulsi */}
+        {[0.05, 0.85].map((y) => (
+          <mesh key={y} position={[0, y, 0.42]}>
+            <boxGeometry args={[w * 0.8, 0.04, 0.04]} />
+            <meshStandardMaterial color="#20262b" metalness={0.6} roughness={0.5} />
+          </mesh>
+        ))}
         <mesh position={[w * 0.3, 0.2, 0.2]}>
           <cylinderGeometry args={[0.12, 0.09, 0.22, 10]} />
           <meshStandardMaterial color="#9a4f33" roughness={1} />
         </mesh>
         <mesh position={[w * 0.3, 0.42, 0.2]}>
-          <icosahedronGeometry args={[0.16, 0]} />
-          <meshStandardMaterial color="#4f6b34" roughness={1} />
+          <icosahedronGeometry args={[0.16, 1]} />
+          <meshStandardMaterial color="#4f6b34" roughness={1} flatShading />
         </mesh>
       </group>
-      {/* the family's window: lit means paid */}
-      <mesh position={[0, 3.05, d / 2 + 0.01]}>
-        <planeGeometry args={[1.1, 0.9]} />
+      {/* the family's window, a pointed arch: lit means paid */}
+      <mesh position={[0, fh + 0.55, d / 2 + 0.012]} geometry={parts.arch}>
         <meshStandardMaterial ref={win} color="#0d1118" emissive="#ffb35c" emissiveIntensity={0} roughness={0.4} toneMapped={false} />
       </mesh>
-      <pointLight ref={glow} position={[0, 3.05, d / 2 + 0.6]} color="#ffb35c" intensity={0} distance={4} decay={2} />
-      {/* ground floor window grill and door */}
-      <mesh position={[-0.6, 1.1, d / 2 + 0.01]}>
-        <planeGeometry args={[0.8, 0.8]} />
-        <meshStandardMaterial color="#1a1d22" roughness={0.6} />
+      <pointLight ref={glow} position={[0, fh + 1.1, d / 2 + 0.6]} color="#ffb35c" intensity={0} distance={4} decay={2} />
+      {/* upper floors: plain windows with green wooden shutters */}
+      {Array.from({ length: floors - 1 }).map((_, k) => (
+        <group key={`u${k}`} position={[0, fh * (k + 2) - 1.05, d / 2 + 0.012]}>
+          {[-0.75, 0.75].map((x) => (
+            <group key={x} position={[x, 0, 0]}>
+              <mesh>
+                <planeGeometry args={[0.6, 0.9]} />
+                <meshStandardMaterial color="#14181e" roughness={0.6} />
+              </mesh>
+              <mesh position={[-0.42, 0, 0.01]}>
+                <planeGeometry args={[0.24, 0.9]} />
+                <meshStandardMaterial color="#2f6b55" roughness={0.8} />
+              </mesh>
+            </group>
+          ))}
+        </group>
+      ))}
+      {/* flat terrace: parapet, a black water tank and a dish */}
+      <mesh position={[0, h + 0.3, d / 2 - 0.05]}>
+        <boxGeometry args={[w, 0.6, 0.12]} />
+        <meshStandardMaterial color={paint} roughness={1} />
       </mesh>
-      <mesh position={[0.65, 0.95, d / 2 + 0.01]}>
-        <planeGeometry args={[0.75, 1.9]} />
-        <meshStandardMaterial color="#5b3a26" roughness={0.9} />
+      <mesh position={[0, h + 0.05, 0]}>
+        <boxGeometry args={[w + 0.06, 0.12, d + 0.06]} />
+        <meshStandardMaterial color="#8d857a" roughness={1} />
       </mesh>
-      {/* hip roof in clay tiles */}
-      <mesh position={[0, h + 0.55, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
-        <coneGeometry args={[Math.hypot(w, d) / 2 + 0.25, 1.1, 4]} />
-        <meshStandardMaterial map={tex.roof} normalMap={tex.roofN} color="#c98a6a" roughness={0.9} />
+      <mesh position={[(i % 2 ? -1 : 1) * 0.7, h + 0.55, -0.4]} castShadow>
+        <cylinderGeometry args={[0.42, 0.42, 0.9, 16]} />
+        <meshStandardMaterial color="#15171a" roughness={0.55} />
       </mesh>
+      {i % 3 === 1 && (
+        <mesh position={[-0.8, h + 0.8, 0.4]} rotation={[0.5, 0.6, 0]}>
+          <cylinderGeometry args={[0.3, 0.05, 0.12, 14]} />
+          <meshStandardMaterial color="#d8d6d0" roughness={0.6} />
+        </mesh>
+      )}
     </group>
   );
 }
@@ -124,18 +179,19 @@ function Centre({ data, tex, clockTexture }: { data: LandingData; tex: ReturnTyp
     c.width = 1024;
     c.height = 200;
     const g = c.getContext("2d")!;
-    g.fillStyle = "#b4432e";
+    g.fillStyle = "#e9a51c";
     g.fillRect(0, 0, 1024, 200);
-    g.strokeStyle = "#f3ead8";
+    g.strokeStyle = "#1b2444";
     g.lineWidth = 8;
     g.strokeRect(14, 14, 996, 172);
-    g.fillStyle = "#f3ead8";
-    g.font = "italic 700 78px Georgia, serif";
+    g.fillStyle = "#b3302b";
+    g.font = "700 72px Georgia, serif";
     g.textAlign = "center";
     g.textBaseline = "middle";
-    g.fillText(data.centre, 512, 92);
-    g.font = "500 30px Georgia, serif";
-    g.fillText("Maths · Science · Classes 6 to 10", 512, 158);
+    g.fillText(data.centre.toUpperCase(), 512, 84, 960);
+    g.fillStyle = "#1b2444";
+    g.font = "600 32px Georgia, serif";
+    g.fillText("Maths · Science · Classes 6 to 10 · Ph. 98XXX XXXXX", 512, 154, 960);
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
     return t;

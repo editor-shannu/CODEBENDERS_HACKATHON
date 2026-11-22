@@ -13,7 +13,7 @@ model Settings {
   id              Int    @id @default(1)
   tutorName       String
   centreName      String
-  city            String @default("Vizianagaram")
+  city            String @default("Hyderabad")
   upiId           String
   upiName         String
   startingBalance Int    @default(0)
