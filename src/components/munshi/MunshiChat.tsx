@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Mic, Send, X } from "lucide-react";
 import { askMunshiAction, setActionStatus } from "@/app/actions";
+import { parseKhata } from "@/lib/voice-khata";
+import { enqueue, isOffline } from "@/lib/offline-queue";
 
 type Rec = { lang: string; interimResults: boolean; maxAlternatives: number; start: () => void; stop: () => void; onresult: ((e: { results: { 0: { transcript: string } }[] }) => void) | null; onerror: (() => void) | null; onend: (() => void) | null };
 type ChatLink = { label: string; url: string; kind: "whatsapp" | "page" };
@@ -43,6 +45,17 @@ export function MunshiChat() {
     setText("");
     setLines((l) => [...l, { who: "you", text: question }]);
     start(async () => {
+      if (isOffline()) {
+        // Offline rules: only "<name> paid <amount> cash|upi" is queued; nothing that sends messages is.
+        const k = parseKhata(question);
+        if (k.name && k.amount && /\b(paid|gave|received|ichharu|diya)\b/i.test(question)) {
+          await enqueue({ kind: "munshiPayment", label: `${k.name} ₹${k.amount.toLocaleString("en-IN")} ${(k.mode ?? "CASH").toLowerCase()}`, at: new Date().toISOString(), text: question });
+          setLines((l) => [...l, { who: "munshi", text: `You're offline. Saved ${k.name}'s ₹${k.amount!.toLocaleString("en-IN")} ${(k.mode ?? "CASH").toLowerCase()} as pending sync; I'll record it as soon as you're back online.`, source: "RULES" }]);
+        } else {
+          setLines((l) => [...l, { who: "munshi", text: "You're offline. I can save payments like \"Ravi paid 1500 cash\" and sync them later; everything else needs a connection.", source: "RULES" }]);
+        }
+        return;
+      }
       try {
         const r = await askMunshiAction(question, { direct: true });
         if (!r.ok) {

@@ -27,6 +27,8 @@ export async function GET(req: Request) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[baaki] demo failed:", msg);
     const hint = /AUTH_SECRET/.test(msg) ? "AUTH_SECRET is not set on this deploy." : /DATABASE_URL|connect|P1001|P2021/.test(msg) ? "The database is not reachable or its tables are missing." : "Something went wrong.";
-    return new NextResponse(`Demo could not start. ${hint}`, { status: 500, headers: { "content-type": "text/plain; charset=utf-8" } });
+    const code = (e as { code?: string }).code ?? "";
+    const detail = msg.replace(/postgres(ql)?:\/\/\S+/gi, "[db]").replace(/[\w.-]+\.neon\.tech\S*/gi, "[host]").split("\n").filter(Boolean).slice(-2).join(" ").slice(0, 220);
+    return new NextResponse(`Demo could not start. ${hint}${code ? ` (${code})` : ""}\n${detail}`, { status: 500, headers: { "content-type": "text/plain; charset=utf-8" } });
   }
 }

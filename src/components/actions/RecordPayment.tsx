@@ -5,6 +5,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Button, inputClass, labelClass } from "@/components/ui/Button";
 import { Stamp } from "@/components/ui/Stamp";
 import { recordFamilyPayment, recordPayment } from "@/app/actions";
+import { enqueue, isOffline } from "@/lib/offline-queue";
 import { formatINR } from "@/lib/money";
 
 export function RecordPaymentButton({
@@ -44,6 +45,13 @@ export function RecordPaymentButton({
   const submit = () =>
     start(async () => {
       setError(null);
+      if (isOffline()) {
+        // Offline: keep it in the device queue; it records itself when the connection is back.
+        if (!invoiceId) return setError("You're offline. Record this from the invoice, or tell Munshi, and it will sync.");
+        await enqueue({ kind: "invoicePayment", label: `₹${Number(amount).toLocaleString("en-IN")} ${mode.toLowerCase()} · ${title ?? "invoice"}`, at: date, input: { invoiceId, amount: Number(amount), mode, reference, date } });
+        setError("Saved offline: pending sync. It records itself when you're back online.");
+        return;
+      }
       const res = familyId
         ? await recordFamilyPayment({ familyId, amount: Number(amount), mode, reference, date })
         : invoiceId
