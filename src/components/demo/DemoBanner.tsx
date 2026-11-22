@@ -9,6 +9,7 @@ export function DemoBanner() {
         <form action={resetDemoAction}>
           <button type="submit" className="min-h-8 border border-dusk-deep px-2 hover:bg-dusk-deep hover:text-lamp">Reset demo</button>
         </form>
+        <a href="https://youtu.be/7ZoK0pLYzmA" target="_blank" rel="noopener noreferrer" className="underline">▶ Demo video</a>
         <a href="/login" className="underline">Use your own centre</a>
       </span>
     </div>

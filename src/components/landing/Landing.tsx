@@ -141,6 +141,15 @@ export function Landing({ data }: { data: LandingData }) {
         </a>
       )}
 
+      <a
+        href="https://youtu.be/7ZoK0pLYzmA"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="absolute left-3 top-16 z-30 inline-flex min-h-11 items-center border border-lamp bg-dusk-deep/85 px-3 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-lamp hover:bg-lamp hover:text-dusk-deep md:left-auto md:right-[440px] md:top-3"
+      >
+        ▶ Watch demo video
+      </a>
+
       {/* the chapter: one chit at a time, swapped in place */}
       <div className="pointer-events-none absolute inset-x-3 bottom-[148px] z-20 md:bottom-10 md:left-8 md:right-auto md:w-[min(520px,42vw)]">
         <div key={c.id} className="chit-in pointer-events-auto border-l-4 border-brick bg-dusk-deep/85 p-5 backdrop-blur-[2px] md:p-6" aria-live="polite">
