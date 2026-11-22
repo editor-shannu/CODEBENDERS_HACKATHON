@@ -1,21 +1,33 @@
 import { Landing } from "@/components/landing/Landing";
 import { DEMO_LANDING, MAX_HOUSES, type LandingData } from "@/components/landing/landing-data";
 import { houseStatusOf } from "@/components/ui/HouseStatus";
+import { getSessionUser } from "@/lib/auth/session";
 import { loadDashboard } from "@/lib/board-view";
 import { dbHealth } from "@/lib/db-health";
+import { db } from "@/lib/db";
 import { formatDate, monthKey } from "@/lib/dates";
 import { sumPaid } from "@/lib/invoice-status";
 import { kidsLabel } from "@/lib/messages";
 
 export const dynamic = "force-dynamic";
 
-/** Reads the real lane (one house per family) from the existing board; falls back to a static demo lane. */
+/**
+ * Visitors see the illustrated demo lane (Lakshmi Teaching Point). A signed-in tutor sees their own
+ * name and centre, and their own families on the lane once they have added some.
+ */
 async function landingData(): Promise<LandingData> {
   try {
     const health = await dbHealth();
     if (!health.ok) return DEMO_LANDING;
+    const user = await getSessionUser();
+    if (!user) return DEMO_LANDING;
+    const viewer = { name: user.name || user.email.split("@")[0] };
+    const settings = await db.settings.findFirst();
+    const tutor = settings?.tutorName || viewer.name;
+    const centre = settings?.centreName || DEMO_LANDING.centre;
+    if (!settings || !(await db.family.count())) return { ...DEMO_LANDING, viewer, tutor, centre };
+
     const { board, forecast } = await loadDashboard();
-    if (!board.families.length) return DEMO_LANDING;
     const month = monthKey(board.today);
     const fams = [...board.families]
       .sort((a, b) => b.stats.monthlyTotal - a.stats.monthlyTotal)
@@ -34,7 +46,9 @@ async function landingData(): Promise<LandingData> {
     const promised = fams.find((f) => f.stats.openPromise && f.stats.balance > 0);
     const munshiNote = promised?.stats.openPromise
       ? `${promised.parentName.split(" ")[0]} promised ${formatDate(promised.stats.openPromise.promisedDate, { weekday: false, year: false })}. I'll remind them the day after.`
-      : DEMO_LANDING.munshiNote;
+      : owed > 0
+        ? "I'm watching who owes and when rent falls due."
+        : "Everyone is paid up. Nothing to chase today.";
     const defense = fams
       .filter((f) => f.stats.balance > 0 && !f.stats.openPromise)
       .sort((a, b) => b.stats.balance - a.stats.balance)
@@ -42,6 +56,7 @@ async function landingData(): Promise<LandingData> {
       .map((f) => f.id);
     return {
       source: "live",
+      viewer,
       centre: board.settings.centreName,
       tutor: board.settings.tutorName,
       families,

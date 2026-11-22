@@ -6,8 +6,7 @@ import { Stamp } from "@/components/ui/Stamp";
 import { HouseStatus } from "@/components/ui/HouseStatus";
 import { Guard } from "@/components/setup/Guard";
 import { PayClaim } from "@/components/invoices/PayClaim";
-import { db } from "@/lib/db";
-import { getSettings } from "@/lib/data";
+import { rawDb } from "@/lib/prisma";
 import { balanceOf } from "@/lib/invoice-status";
 import { formatDate, formatMonth } from "@/lib/dates";
 import { formatINR } from "@/lib/money";
@@ -21,10 +20,12 @@ export default async function PayPage({ params }: { params: Promise<{ token: str
   return (
     <Guard>
       {async () => {
-        const inv = await db.invoice.findUnique({ where: { payToken: token }, include: { family: { select: { parentName: true, students: { where: { active: true }, select: { name: true } } } }, payments: true, claims: { where: { status: "PENDING" } } } });
+        // Public page: parents are not signed in, so it reads by the unguessable token only, never anything else.
+        const inv = await rawDb.invoice.findUnique({ where: { payToken: token }, include: { family: { select: { parentName: true, students: { where: { active: true }, select: { name: true } } } }, payments: true, claims: { where: { status: "PENDING" } } } });
         // pay links only work once the invoice is issued
         if (!inv || inv.status === "DRAFT") notFound();
-        const settings = await getSettings();
+        const settings = await rawDb.settings.findUnique({ where: { userId: inv.userId }, select: { centreName: true, tutorName: true, upiId: true, upiName: true } });
+        if (!settings) notFound();
         const bal = balanceOf(inv);
         const kids = inv.family.students.filter(() => true).map((s) => s.name.split(" ")[0]).join(", ");
         const upi = upiLink({ vpa: settings.upiId, name: settings.upiName, amount: bal, note: `${inv.number} ${kids}` });

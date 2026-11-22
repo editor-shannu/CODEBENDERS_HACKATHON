@@ -10,6 +10,12 @@ export function isPaused(pausedMonths: string | null | undefined, month: string)
   return (pausedMonths ?? "").split(",").map((m) => m.trim()).includes(month);
 }
 
+/** Invoice number prefix from the centre's initials ("Lakshmi Teaching Point" -> "LTP"); "INV" when unset. */
+export function invoicePrefix(centreName: string): string {
+  const initials = centreName.split(/\s+/).map((w) => w.replace(/[^A-Za-z]/g, "")[0] ?? "").join("").toUpperCase().slice(0, 4);
+  return initials.length >= 2 ? initials : "INV";
+}
+
 /** Creates one family's invoice for a month (sibling discount applied). Returns null when it exists or no student is active. */
 export async function createInvoiceFor(familyId: string, month: string, status: "DRAFT" | "SENT" = "DRAFT") {
   const f = await db.family.findUnique({ where: { id: familyId }, include: { students: true, invoices: { where: { month } } } });
@@ -20,9 +26,11 @@ export async function createInvoiceFor(familyId: string, month: string, status: 
   const sorted = [...active].sort((a, b) => b.monthlyFee - a.monthlyFee);
   const amount = familyMonthlyFee(active);
   const gross = active.reduce((s, x) => s + x.monthlyFee, 0);
+  const settings = await db.settings.findFirst({ select: { centreName: true } });
+  const prefix = invoicePrefix(settings?.centreName ?? "");
   const n = (await db.invoice.count({ where: { month } })) + 1;
-  let number = `LTP-${month}-${String(n).padStart(3, "0")}`;
-  if (await db.invoice.findUnique({ where: { number } })) number = `${number}-${randomBytes(2).toString("hex")}`;
+  let number = `${prefix}-${month}-${String(n).padStart(3, "0")}`;
+  if (await db.invoice.findFirst({ where: { number } })) number = `${number}-${randomBytes(2).toString("hex")}`;
   return db.invoice.create({
     data: {
       number,

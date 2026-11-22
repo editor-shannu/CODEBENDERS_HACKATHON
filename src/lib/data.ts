@@ -10,17 +10,22 @@ import { usualDayOf } from "./munshi/memory";
 import { formatINR } from "./money";
 import { kidsLabel } from "./messages";
 
-export async function getSettings() {
-  // Never let the root layout crash: fall back to defaults if the database is unavailable.
-  const s = process.env.DATABASE_URL ? await db.settings.findUnique({ where: { id: 1 } }).catch(() => null) : null;
+export type SettingsRow = Awaited<ReturnType<typeof db.settings.findFirstOrThrow>>;
+
+/**
+ * The signed-in tutor's centre settings. Never crashes the root layout: with nobody signed in, no
+ * database, or setup not finished yet, it returns neutral defaults (tutor pages require real settings).
+ */
+export async function getSettings(): Promise<SettingsRow> {
+  const s = process.env.DATABASE_URL ? await db.settings.findFirst().catch(() => null) : null;
   return (
     s ?? {
-      id: 1,
-      tutorName: "Lakshmi Devi",
-      centreName: "Lakshmi Teaching Point",
+      userId: "",
+      tutorName: "",
+      centreName: "Baaki",
       city: "Hyderabad",
-      upiId: "lakshmi.tuition@okaxis",
-      upiName: "Lakshmi Teaching Point",
+      upiId: "",
+      upiName: "",
       startingBalance: 0,
       autonomy: "ASK",
       monthlyGoal: 0,

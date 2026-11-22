@@ -121,12 +121,13 @@ export function Landing({ data }: { data: LandingData }) {
       <div className="pointer-events-none absolute left-4 top-3 z-20 md:left-6 md:top-5">
         <p className="font-display text-3xl leading-none text-lamp md:text-4xl">Baaki</p>
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-plaster/70">{data.centre}</p>
+        {data.viewer && <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-lamp/80">Namaste, {data.viewer.name.split(" ")[0]}</p>}
       </div>
       <Link
-        href="/home"
+        href={data.viewer ? "/home" : "/login"}
         className="absolute right-3 top-3 z-30 inline-flex min-h-11 items-center border border-plaster/30 bg-dusk-deep/80 px-3 font-mono text-[11px] uppercase tracking-[0.14em] text-plaster hover:border-lamp hover:text-lamp"
       >
-        Skip to dashboard
+        {data.viewer ? "Open dashboard" : "Sign in"}
       </Link>
 
       {/* the chapter: one chit at a time, swapped in place */}
@@ -148,7 +149,7 @@ export function Landing({ data }: { data: LandingData }) {
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <button type="button" onClick={runCentre} className="min-h-14 border border-lamp bg-lamp px-4 text-left font-mono text-sm font-semibold uppercase tracking-[0.1em] text-dusk-deep">
                 I run the centre
-                <span className="block text-[11px] font-normal normal-case tracking-normal">Open the dashboard</span>
+                <span className="block text-[11px] font-normal normal-case tracking-normal">{data.viewer ? "Open the dashboard" : "Sign in with Google"}</span>
               </button>
               <Link href="/parent" className="flex min-h-14 flex-col justify-center border border-plaster/40 px-4 font-mono text-sm font-semibold uppercase tracking-[0.1em] text-plaster hover:border-lamp">
                 I&apos;m a parent
