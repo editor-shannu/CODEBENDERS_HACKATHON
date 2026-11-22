@@ -378,3 +378,39 @@ export async function dismissRentPlan(): Promise<ActionResult> {
   refreshAll();
   return { ok: true };
 }
+
+/* ---------- Paste & Match ---------- */
+export async function matchUpiSmsAction(text: string) {
+  if (!text.trim()) return { ok: false as const, error: "Paste the SMS first" };
+  const { parseUpiSms, matchInvoices } = await import("@/lib/upi-sms");
+  const today = todayIST();
+  const parsed = parseUpiSms(text.slice(0, 600), today);
+  const invoices = await db.invoice.findMany({ where: { status: { in: ["SENT", "PARTIAL"] } }, include: { payments: true, family: { include: { students: true } } } });
+  const open = invoices
+    .map((i) => ({ invoiceId: i.id, familyId: i.familyId, parent: i.family.parentName, kids: i.family.students.map((s) => s.name), balance: i.amount - sumPaid(i.payments), number: i.number, dueDate: toKey(i.dueDate) }))
+    .filter((o) => o.balance > 0);
+  const already = parsed.utr ? await db.payment.findFirst({ where: { reference: parsed.utr } }) : null;
+  return { ok: true as const, parsed, matches: matchInvoices(parsed, open), duplicate: !!already, today: toKey(today) };
+}
+
+/* ---------- Voice Khata ---------- */
+export async function voiceKhataAction(text: string) {
+  const { parseKhata } = await import("@/lib/voice-khata");
+  const note = parseKhata(text.slice(0, 300));
+  if (!note.name) return { ok: false as const, error: "Say who paid, like \"Ravi paid 1500 cash\"" };
+  const q = note.name.split(" ")[0];
+  const families = await db.family.findMany({ include: { students: true, invoices: { where: { status: { not: "DRAFT" } }, include: { payments: true } } } });
+  const fam = families.find((f) => f.parentName.toLowerCase().split(" ").some((w) => w.startsWith(q)) || f.students.some((s) => s.name.toLowerCase().split(" ")[0].startsWith(q)));
+  if (!fam) return { ok: false as const, error: `No family or student called ${note.name}` };
+  const balance = fam.invoices.reduce((s, i) => s + Math.max(0, i.amount - sumPaid(i.payments)), 0);
+  return { ok: true as const, note, familyId: fam.id, parent: fam.parentName, balance, today: toKey(todayIST()) };
+}
+
+/* ---------- Fee Pause ---------- */
+export async function setStudentPause(studentId: string, months: string[]): Promise<ActionResult> {
+  const clean = [...new Set(months.filter((m) => /^\d{4}-(0[1-9]|1[0-2])$/.test(m)))].sort();
+  const s = await db.student.update({ where: { id: studentId }, data: { pausedMonths: clean.join(",") } });
+  await db.agentAction.create({ data: { type: "NOTE", familyId: s.familyId, title: clean.length ? `Fee paused for ${s.name}: ${clean.join(", ")}` : `Fee pause cleared for ${s.name}`, status: "DONE", source: "RULES" } });
+  refreshAll();
+  return { ok: true, message: clean.length ? `Paused for ${clean.length} month${clean.length > 1 ? "s" : ""}` : "Pause cleared" };
+}

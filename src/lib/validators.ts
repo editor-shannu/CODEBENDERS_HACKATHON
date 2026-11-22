@@ -45,6 +45,7 @@ export const settingsSchema = z.object({
   upiName: z.string().trim().min(2),
   startingBalance: z.coerce.number().int(),
   autonomy: z.enum(AUTONOMY),
+  monthlyGoal: z.coerce.number().int().min(0).max(10_000_000).default(0),
 });
 
 export const claimSchema = z.object({

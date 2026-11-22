@@ -222,3 +222,23 @@ function nextDue(today: Date, day: number) {
   const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), day));
   return d >= today ? d : new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, day));
 }
+
+/** Goal Mode: Munshi's suggestion for closing this month's collection gap, likeliest payers first. */
+export function goalSuggestion(opts: { families: FamilyWithStats[]; forecast: ForecastResult; gap: number }): { text: string; familyIds: string[] } {
+  if (opts.gap <= 0) return { text: "Goal reached. Nothing more to chase this month.", familyIds: [] };
+  const ranked = opts.families
+    .filter((f) => f.stats.balance > 0)
+    .map((f) => ({ f, likely: (opts.forecast.payBeforeRent[f.id] ?? 0.5) * 0.5 + f.stats.promiseScore * 0.5 }))
+    .sort((a, b) => b.likely * b.f.stats.balance - a.likely * a.f.stats.balance);
+  const pick: typeof ranked = [];
+  let sum = 0;
+  for (const r of ranked) {
+    if (sum >= opts.gap) break;
+    pick.push(r);
+    sum += r.f.stats.balance;
+  }
+  if (!pick.length) return { text: `${formatINR(opts.gap)} to go, but nobody owes anything yet. Generate and issue this month's invoices.`, familyIds: [] };
+  const names = pick.map((r) => `${r.f.parentName.split(" ")[0]} (${formatINR(r.f.stats.balance)})`);
+  const covers = sum >= opts.gap ? "would close it" : `would bring in ${formatINR(sum)} of it`;
+  return { text: `${formatINR(opts.gap)} to go. Chasing ${names.join(", ")} ${covers}.`, familyIds: pick.map((r) => r.f.id) };
+}

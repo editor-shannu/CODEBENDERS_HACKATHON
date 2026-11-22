@@ -3,6 +3,8 @@ import { Guard } from "@/components/setup/Guard";
 import { ApproveAllBrief, BriefActions } from "@/components/munshi/BriefActions";
 import { AskMunshi, InboxButtons, PlanControls, PlanStepAction, ReplyReader } from "@/components/munshi/MunshiTools";
 import { loadActivePlan } from "@/lib/munshi/plan";
+import { PasteMatch } from "@/components/actions/PasteMatch";
+import { VoiceKhata } from "@/components/actions/VoiceKhata";
 import { AUTONOMY_LABEL, autoRunBrief } from "@/lib/munshi/execute";
 import { loadDashboard } from "@/lib/board-view";
 import { buildRentPlan } from "@/lib/munshi/rules";
@@ -136,6 +138,14 @@ export default function MunshiPage() {
               <section>
                 <Eyebrow className="mb-2">Ask Munshi</Eyebrow>
                 <Card><AskMunshi aiOn={aiOn} /></Card>
+              </section>
+              <section>
+                <Eyebrow className="mb-2">Paste &amp; Match</Eyebrow>
+                <Card><PasteMatch /></Card>
+              </section>
+              <section>
+                <Eyebrow className="mb-2">Voice Khata</Eyebrow>
+                <Card><VoiceKhata /></Card>
               </section>
             </div>
 

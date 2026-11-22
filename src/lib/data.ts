@@ -23,6 +23,7 @@ export async function getSettings() {
       upiName: "Lakshmi Teaching Point",
       startingBalance: 0,
       autonomy: "ASK",
+      monthlyGoal: 0,
     }
   );
 }

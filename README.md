@@ -195,7 +195,7 @@ Every write goes through `proposeOrRun()` in `src/lib/munshi/execute.ts`. With t
 
 ## Roadmap
 
-WhatsApp Business API sending · tests for the forecast and date engine · multi-tutor accounts.
+WhatsApp Business API sending · multi-tutor accounts · Telugu-script names in Voice Khata.
 
 ## Team
 
