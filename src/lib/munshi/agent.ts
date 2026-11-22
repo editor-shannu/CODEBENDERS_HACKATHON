@@ -82,6 +82,15 @@ export function parseReplyRules(text: string, today: Date, balance: number): Rea
 /* LLM plumbing (any OpenAI-compatible endpoint, Groq by default)    */
 /* ------------------------------------------------------------------ */
 
+
+/** Code-built what-if sentence: every amount and percentage comes from the tool result, never the model. */
+export function whatIfSentence(r: { scenarioLabel?: string | null; dropBy: string; direction: string; likelyBalanceIn90DaysBefore: number; likelyBalanceIn90DaysAfter: number; rentRiskBefore: string | null; rentRiskAfter: string | null }): string {
+  const lead = r.scenarioLabel ? `If ${r.scenarioLabel}, your` : "Your";
+  const move = r.dropBy === formatINR(0) ? `would stay about the same (${formatINR(r.likelyBalanceIn90DaysBefore)})` : `would ${r.direction} by roughly ${r.dropBy} (from ${formatINR(r.likelyBalanceIn90DaysBefore)} to ${formatINR(r.likelyBalanceIn90DaysAfter)})`;
+  const risk = r.rentRiskBefore ? ` Rent risk goes from ${r.rentRiskBefore} to ${r.rentRiskAfter}.` : "";
+  return `${lead} likely balance in 90 days ${move}.${risk}`;
+}
+
 export const llmEnabled = () => Boolean(process.env.LLM_API_KEY);
 
 export type Msg = { role: "system" | "user" | "assistant" | "tool"; content: string | null; tool_calls?: ToolCall[]; tool_call_id?: string };
@@ -231,9 +240,15 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx, so
       const after = runForecast(ctx.input, w);
       const before = ctx.forecast;
       const pct = (r: number | undefined) => (r === undefined ? null : `${Math.round(r * 100)}%`);
+      const delayFam = w.extraDelay && w.extraDelay.familyId !== "ALL" ? ctx.families.find((x) => x.id === w.extraDelay!.familyId) : undefined;
+      const diff = before.end90.p50 - after.end90.p50;
       return {
         result: {
           scenario: w,
+          scenarioLabel: w.extraDelay ? `${delayFam ? delayFam.parentName : "Everyone"} pays ${w.extraDelay.days} days late` : null,
+          dropBy: formatINR(Math.abs(diff)),
+          dropByRupees: Math.abs(diff),
+          direction: diff >= 0 ? "drop" : "rise",
           rentRiskBefore: pct(before.rent?.risk),
           rentRiskAfter: pct(after.rent?.risk),
           runwayDaysBefore: before.runwayDays,
@@ -429,9 +444,8 @@ async function rulesAnswer(q: string, ctx: Ctx): Promise<AskResult> {
     const add = num(s, /(\d+)\s*new\s*(?:student|admission|kid)/);
     if (add) args.newStudents = add;
     if (!Object.keys(args).length) args.extraDelayDays = 7;
-    const r = (await call("run_what_if", args)) as { rentRiskBefore: string | null; rentRiskAfter: string | null; runwayDaysBefore: number; runwayDaysAfter: number; likelyBalanceIn90DaysBefore: number; likelyBalanceIn90DaysAfter: number };
-    const risk = r.rentRiskBefore ? ` Rent risk goes from ${r.rentRiskBefore} to ${r.rentRiskAfter}.` : "";
-    answer = `In 90 days your likely balance would be ${formatINR(r.likelyBalanceIn90DaysAfter)} instead of ${formatINR(r.likelyBalanceIn90DaysBefore)}.${risk} Runway: ${r.runwayDaysAfter >= 90 ? "90+" : r.runwayDaysAfter} days (was ${r.runwayDaysBefore >= 90 ? "90+" : r.runwayDaysBefore}).`;
+    const r = (await call("run_what_if", args)) as Parameters<typeof whatIfSentence>[0] & { runwayDaysBefore: number; runwayDaysAfter: number };
+    answer = `${whatIfSentence(r)} Runway: ${r.runwayDaysAfter >= 90 ? "90+" : r.runwayDaysAfter} days (was ${r.runwayDaysBefore >= 90 ? "90+" : r.runwayDaysBefore}).`;
   } else if (named && /draft|write|message|whatsapp|remind(er)? text|compose/.test(s)) {
     const r = (await call("draft_reminder", { name: named.parentName, ...(tone ? { tone } : {}) })) as { draft?: string; note?: string; status?: string };
     answer = r.draft ? `Here's a draft for ${named.parentName}. I haven't sent it; it's ${r.status}.\n\n${r.draft}` : r.note ?? "I couldn't draft that.";
@@ -488,6 +502,7 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
   const actions: { title: string; status: string }[] = [];
   const links: ChatLink[] = [];
   const results: unknown[] = [];
+  const whatIfs: Parameters<typeof whatIfSentence>[0][] = [];
   const messages: Msg[] = [
     { role: "system", content: munshiSystemPrompt(ctx) },
     { role: "user", content: question },
@@ -507,6 +522,7 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
           if (out.links) links.push(...out.links);
           trace.push({ kind: "result", text: JSON.stringify(out.result).slice(0, 300) });
           results.push(out.result);
+          if (tc.function.name === "run_what_if") whatIfs.push(out.result as Parameters<typeof whatIfSentence>[0]);
           messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(out.result) });
         }
         continue;
@@ -517,6 +533,11 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
       const checked = checkAmounts(answer, numbersIn(results));
       if (checked !== answer) trace.push({ kind: "think", text: "Guardrail: dropped an amount that no tool returned." });
       answer = checked;
+      if (whatIfs.length) {
+        // Numbers come from code; the model only adds advice (sentences without amounts or percentages).
+        const advice = answer.split(/(?<=[.!?])\s+/).filter((x) => x && !/[₹%\d]/.test(x)).slice(0, 1).join(" ");
+        answer = [whatIfSentence(whatIfs[whatIfs.length - 1]), advice].filter(Boolean).join(" ");
+      }
       if (isThreatening(answer)) {
         trace.push({ kind: "think", text: "Guardrail: the AI answer used threatening or shaming words, switched to offline rules." });
         if (!actions.length) {
