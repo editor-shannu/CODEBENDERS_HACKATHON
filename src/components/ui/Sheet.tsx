@@ -12,11 +12,11 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center md:items-center" role="dialog" aria-modal="true" aria-label={title}>
-      <button className="absolute inset-0 bg-ink/80" aria-label="Close" onClick={onClose} />
-      <div className="sheet-in ruled-paper relative max-h-[90dvh] w-full max-w-lg overflow-y-auto border-t-4 border-khata p-5 text-ink md:border">
+      <button className="absolute inset-0 bg-dusk-deep/60" aria-label="Close" onClick={onClose} />
+      <div className="sheet-in bg-plaster relative max-h-[90dvh] w-full max-w-lg overflow-y-auto border-t-4 border-slate-mute p-5 text-dusk-deep md:border">
         <div className="mb-4 flex items-start justify-between gap-4">
           <h2 className="font-display text-2xl leading-tight">{title}</h2>
-          <button onClick={onClose} className="min-h-11 min-w-11 font-mono text-xs uppercase tracking-widest text-ink/60" aria-label="Close">
+          <button onClick={onClose} className="min-h-11 min-w-11 font-mono text-xs uppercase tracking-widest text-dusk-deep/60" aria-label="Close">
             Close
           </button>
         </div>
