@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { rawDb } from "../prisma";
@@ -22,6 +23,15 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   return user;
 });
 
+/**
+ * Server-to-server callers with no cookie (the WhatsApp webhook) run as a known tutor after their own
+ * check (signed webhook + allow-listed phone number). Never call this from a user-facing request.
+ */
+const actingUser = new AsyncLocalStorage<string>();
+export function runAsUser<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  return actingUser.run(userId, fn);
+}
+
 export class UnauthenticatedError extends Error {
   constructor() {
     super("Please sign in");
@@ -31,6 +41,8 @@ export class UnauthenticatedError extends Error {
 
 /** The signed-in user's id; throws when nobody is signed in. Used by the tenant-scoped db client. */
 export async function currentUserId(): Promise<string> {
+  const asUser = actingUser.getStore();
+  if (asUser) return asUser;
   const u = await getSessionUser();
   if (!u) throw new UnauthenticatedError();
   return u.id;
