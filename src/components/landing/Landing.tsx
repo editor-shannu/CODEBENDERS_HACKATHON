@@ -129,6 +129,14 @@ export function Landing({ data }: { data: LandingData }) {
       >
         {data.viewer ? "Open dashboard" : "Sign in"}
       </Link>
+      {!data.viewer && (
+        <a
+          href="/api/demo"
+          className="absolute right-3 top-16 z-30 inline-flex min-h-11 items-center border border-lamp bg-lamp px-3 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-dusk-deep hover:bg-plaster md:right-[150px] md:top-3"
+        >
+          Try the demo
+        </a>
+      )}
 
       {/* the chapter: one chit at a time, swapped in place */}
       <div className="pointer-events-none absolute inset-x-3 bottom-[148px] z-20 md:bottom-10 md:left-8 md:right-auto md:w-[min(520px,42vw)]">
@@ -151,6 +159,12 @@ export function Landing({ data }: { data: LandingData }) {
                 I run the centre
                 <span className="block text-[11px] font-normal normal-case tracking-normal">{data.viewer ? "Open the dashboard" : "Sign in with Google"}</span>
               </button>
+              {!data.viewer && (
+                <a href="/api/demo" className="flex min-h-14 flex-col justify-center border border-lamp px-4 font-mono text-sm font-semibold uppercase tracking-[0.1em] text-lamp hover:bg-lamp hover:text-dusk-deep sm:col-span-2">
+                  Try the demo
+                  <span className="block text-[11px] font-normal normal-case tracking-normal text-plaster/70">No sign-in. A sample centre with synthetic data.</span>
+                </a>
+              )}
               <Link href="/parent" className="flex min-h-14 flex-col justify-center border border-plaster/40 px-4 font-mono text-sm font-semibold uppercase tracking-[0.1em] text-plaster hover:border-lamp">
                 I&apos;m a parent
                 <span className="block text-[11px] font-normal normal-case tracking-normal text-plaster/70">See and pay your fee</span>

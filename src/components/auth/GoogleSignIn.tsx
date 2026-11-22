@@ -44,9 +44,11 @@ export function GoogleSignIn({ next }: { next: string }) {
             ? "Your browser blocked the Google window. Allow pop-ups for this site and try again."
             : code === "auth/unauthorized-domain"
               ? "This website isn't on the Firebase authorized domains list yet."
-              : e instanceof Error && !code
-                ? e.message
-                : "Sign-in failed. Please try again.",
+              : code === "auth/operation-not-allowed"
+                ? "Google sign-in is turned off in Firebase (Authentication → Sign-in method → Google)."
+                : e instanceof Error && !code
+                  ? e.message
+                  : `Sign-in failed (${code || "unknown error"}). You can still try the demo.`,
       );
       setBusy(false);
     }

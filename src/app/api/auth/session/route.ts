@@ -15,6 +15,21 @@ const body = z.object({ idToken: z.string().min(100).max(4096), next: z.string()
  * New Google accounts get a user row (sign-up) and go to onboarding; returning ones go to the dashboard.
  */
 export async function POST(req: Request) {
+  try {
+    return await handle(req);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[baaki] sign-in failed:", msg);
+    const hint = /AUTH_SECRET/.test(msg)
+      ? "Server setup: AUTH_SECRET is missing on this deploy."
+      : /P1001|P2021|connect|DATABASE_URL|does not exist/.test(msg)
+        ? "Server setup: the database is unreachable or its tables are missing."
+        : "Server error while signing in.";
+    return NextResponse.json({ error: hint }, { status: 500 });
+  }
+}
+
+async function handle(req: Request) {
   if (!isSameOrigin(req)) return NextResponse.json({ error: "Bad origin" }, { status: 403 });
   const parsed = body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Bad request" }, { status: 400 });
@@ -23,8 +38,9 @@ export async function POST(req: Request) {
   try {
     identity = await verifyFirebaseIdToken(parsed.data.idToken);
   } catch (e) {
-    console.warn("[baaki] sign-in rejected:", e instanceof Error ? e.message : e);
-    return NextResponse.json({ error: "Sign-in could not be verified. Please try again." }, { status: 401 });
+    const why = e instanceof Error ? e.message : String(e);
+    console.warn("[baaki] sign-in rejected:", why);
+    return NextResponse.json({ error: `Google sign-in could not be verified (${why.slice(0, 120)}).` }, { status: 401 });
   }
 
   const existing = await rawDb.user.findUnique({ where: { firebaseUid: identity.uid } });
