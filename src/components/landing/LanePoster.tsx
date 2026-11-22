@@ -9,7 +9,7 @@ export function LanePoster({ data, chapter, className = "" }: { data: LandingDat
   const houses = data.families;
   const n = Math.max(houses.length, 1);
   const night = chapter >= 6;
-  const cloudy = chapter === 4;
+  const cloudy = chapter === 4 && !!data.rent?.atRisk;
   const W = 1200;
   const groundY = 560;
   const slot = (W - 120) / (n + 1);

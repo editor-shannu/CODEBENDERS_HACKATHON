@@ -10,6 +10,7 @@ import { Atmosphere } from "./Atmosphere";
 import { Lane } from "./Lane";
 import { Bird, ChaiStall, Charminar, CityBlocks, NeemTree, Traffic, Wires } from "./Props";
 import { Rig } from "./Rig";
+import { ChalkLine, Clouds, Slips, useRentClock } from "./Story";
 
 type Props = { data: LandingData; control: StageControl; onReady: () => void; onFallback: () => void };
 
@@ -55,7 +56,7 @@ export default function Scene({ data, control, onReady, onFallback }: Props) {
             <Rig control={control} />
             <CityBlocks />
             <Charminar control={control} />
-            <Lane data={data} control={control} />
+            <StoryLane data={data} control={control} />
             <NeemTree position={[9.2, 0, -0.4]} />
             <ChaiStall position={[-5.2, 0, 1.6]} />
             <mesh position={[-4.6, 2.7, 0.6]}>
@@ -83,6 +84,19 @@ export default function Scene({ data, control, onReady, onFallback }: Props) {
         </PerformanceMonitor>
       </Canvas>
     </div>
+  );
+}
+
+/** The lane plus the month's story beats: slips, clouds, the rent clock and the chalk line. */
+function StoryLane({ data, control }: { data: LandingData; control: StageControl }) {
+  const clock = useRentClock(data, control);
+  return (
+    <>
+      <Lane data={data} control={control} clockTexture={clock} />
+      <Slips data={data} control={control} />
+      <Clouds data={data} control={control} />
+      <ChalkLine data={data} control={control} />
+    </>
   );
 }
 

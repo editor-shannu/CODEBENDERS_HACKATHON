@@ -1,7 +1,7 @@
 import { Landing } from "@/components/landing/Landing";
 import { DEMO_LANDING, MAX_HOUSES, type LandingData } from "@/components/landing/landing-data";
 import { houseStatusOf } from "@/components/ui/HouseStatus";
-import { loadBoard } from "@/lib/data";
+import { loadDashboard } from "@/lib/board-view";
 import { dbHealth } from "@/lib/db-health";
 import { formatDate, monthKey } from "@/lib/dates";
 import { sumPaid } from "@/lib/invoice-status";
@@ -14,7 +14,7 @@ async function landingData(): Promise<LandingData> {
   try {
     const health = await dbHealth();
     if (!health.ok) return DEMO_LANDING;
-    const board = await loadBoard();
+    const { board, forecast } = await loadDashboard();
     if (!board.families.length) return DEMO_LANDING;
     const month = monthKey(board.today);
     const fams = [...board.families]
@@ -30,7 +30,7 @@ async function landingData(): Promise<LandingData> {
     const thisMonth = board.families.flatMap((f) => f.invoices.filter((i) => i.month === month));
     const collected = thisMonth.reduce((s, i) => s + Math.min(i.amount, sumPaid(i.payments)), 0);
     const owed = board.totalPending;
-    const rentBill = board.bills.find((b) => /rent/i.test(b.name)) ?? board.bills[0] ?? null;
+    const r = forecast.rent;
     const promised = fams.find((f) => f.stats.openPromise && f.stats.balance > 0);
     const munshiNote = promised?.stats.openPromise
       ? `${promised.parentName.split(" ")[0]} promised ${formatDate(promised.stats.openPromise.promisedDate, { weekday: false, year: false })}. I'll remind them the day after.`
@@ -47,7 +47,7 @@ async function landingData(): Promise<LandingData> {
       families,
       collected,
       owed,
-      rent: rentBill ? { name: rentBill.name, amount: rentBill.amount, dueDay: rentBill.dueDay } : null,
+      rent: r ? { name: r.name, amount: r.amount, dueDay: Number(r.date.slice(8, 10)), daysUntil: r.daysUntil, atRisk: r.risk >= 0.4 } : null,
       munshiNote,
       defense,
     };
