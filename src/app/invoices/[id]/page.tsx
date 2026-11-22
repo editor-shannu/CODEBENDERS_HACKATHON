@@ -30,7 +30,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         const bal = balanceOf(inv);
         const lines: Line[] = JSON.parse(inv.lines || "[]");
         const upi = upiLink({ vpa: settings.upiId, name: settings.upiName, amount: bal || inv.amount, note: `${inv.number} ${formatMonth(inv.month)}` });
-        const qr = await QRCode.toDataURL(upi, { margin: 1, width: 240, color: { dark: "#0E0E0E", light: "#F3EAD7" } });
+        const qr = await QRCode.toDataURL(upi, { margin: 1, width: 240, color: { dark: "#1b2444", light: "#fbf6ea" } });
         const payUrl = `${await getOrigin()}/pay/${inv.payToken}`;
         return (
           <div>
@@ -48,7 +48,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               </div>
               <Eyebrow>Fee invoice</Eyebrow>
               <h1 className="font-display text-3xl">{settings.centreName}</h1>
-              <p className="font-mono text-xs text-dusk-deep/60">{settings.tutorName} · {settings.city}</p>
+              <p className="font-mono text-xs text-dusk-deep/60">{settings.tutorName}</p>
 
               <div className="mt-6 grid grid-cols-2 gap-4 font-mono text-sm">
                 <div><p className="text-[11px] uppercase tracking-widest text-dusk-deep/60">Billed to</p><p>{inv.family.parentName}</p></div>

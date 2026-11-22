@@ -1,32 +1,63 @@
 @import "tailwindcss";
 
+/*
+ * "Old City" palette, taken from Hyderabad's old city:
+ *   dusk       lime-washed wall (page background)
+ *   dusk-deep  Pochampally indigo ink (text on paper, dark boards)
+ *   plaster    the main text colour: indigo on the wall, cream on dark boards
+ *   paper      khata paper (cards)
+ *   lamp       haldi (paid, positive, primary): deep on paper, bright on boards
+ *   brick      lac-bangle red (overdue, broken promise, PAID stamp ink)
+ *   slate-mute dust (secondary text)
+ * Dark surfaces (indigo boards, red cards) switch plaster and lamp to their bright values,
+ * so the same class reads correctly on both.
+ */
 @theme {
-  --color-dusk: #141c2b;
-  --color-dusk-deep: #0c1220;
-  --color-lamp: #f2b35a;
-  --color-brick: #b4432e;
-  --color-plaster: #f3ead8;
-  --color-slate-mute: #8a97a8;
-  --font-display: var(--font-fraunces), Georgia, serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  --color-dusk: #ece3cd;
+  --color-dusk-deep: #1b2444;
+  --color-lamp: #b97c06;
+  --color-brick: #b3302b;
+  --color-plaster: #1b2444;
+  --color-paper: #fbf6ea;
+  --color-slate-mute: #6f6555;
+  --font-display: var(--font-rozha), "Times New Roman", serif;
+  --font-mono: var(--font-courier), "Courier New", monospace;
+  --font-sans: var(--font-hind), system-ui, sans-serif;
 }
 
+/* Dark boards: indigo and red surfaces flip text back to cream and haldi to bright. */
+[class*="bg-dusk-deep"]:not([class*="bg-dusk-deep/5"]):not([class*="bg-dusk-deep/10"]),
+[class*="bg-brick"]:not([class*="bg-brick/"]),
+.board {
+  --color-plaster: #f6eedb;
+  --color-lamp: #f2b01e;
+  --color-slate-mute: #a9b0c4;
+}
+
+/* Paper cards keep paper whatever plaster means in context. */
+.bg-plaster { background-color: var(--color-paper); }
+
 body {
-  background: var(--color-dusk);
+  background-color: var(--color-dusk);
+  /* lime wash: a faint, fixed plaster grain (an SVG noise tile, not a gradient) */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .36 0 0 0 0 .25 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
   color: var(--color-plaster);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans);
   margin: 0;
 }
 
+/* Signboard lettering is painted upright. */
+.font-display { font-style: normal; letter-spacing: 0.005em; }
+
 .ruled-paper {
   position: relative;
-  background-color: var(--color-plaster);
+  background-color: var(--color-paper);
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0,
     transparent 27px,
-    rgba(14, 14, 14, 0.08) 27px,
-    rgba(14, 14, 14, 0.08) 28px
+    rgba(27, 36, 68, 0.09) 27px,
+    rgba(27, 36, 68, 0.09) 28px
   );
   padding-left: 48px;
 }
@@ -71,13 +102,16 @@ body {
   border: 1px solid rgba(14, 14, 14, 0.2);
 }
 
-/* ---------- Ledger Noir additions ---------- */
+/* ---------- additions ---------- */
 html { -webkit-tap-highlight-color: transparent; }
 body { font-feature-settings: "ss01"; }
 ::selection { background: var(--color-lamp); color: var(--color-dusk-deep); }
 
 .stamp { mix-blend-mode: multiply; }
-.bg-dusk .stamp, .text-plaster .stamp { mix-blend-mode: normal; }
+[class*="bg-dusk-deep"] .stamp { mix-blend-mode: normal; }
+
+/* Typewritten labels: Courier reads better with less tracking than a geometric mono. */
+.font-mono.uppercase { letter-spacing: 0.06em; }
 
 @keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: no-preference) {

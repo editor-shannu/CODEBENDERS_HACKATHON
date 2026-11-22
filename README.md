@@ -2,7 +2,7 @@
 
 **The back office for home tutors.** Who owes, what's coming, and a clerk that chases for you.
 
-Baaki (Telugu/Hindi for "what's still due") replaces the fee notebook and the awkward WhatsApp follow-up for India's solo home tutors. The demo runs for **Lakshmi Teaching Point**, a home tuition centre in Vizianagaram, Andhra Pradesh, run by Lakshmi Devi, who teaches maths and science to classes 6 to 10.
+Baaki (Telugu/Hindi for "what's still due") replaces the fee notebook and the awkward WhatsApp follow-up for India's solo home tutors. The demo runs for **Lakshmi Teaching Point**, a home tuition centre in Hyderabad, run by Lakshmi Devi, who teaches maths and science to classes 6 to 10.
 
 Live demo: https://codebendershackathon.vercel.app
 

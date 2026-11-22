@@ -2,7 +2,7 @@
 
 ## What it is
 Baaki is a web app for "Lakshmi Teaching Point", a solo home tuition centre run by
-Lakshmi Devi in Vizianagaram, Andhra Pradesh. She teaches maths and science to
+Lakshmi Devi in Hyderabad. She teaches maths and science to
 classes 6 to 10 and tracks fees today in a notebook and WhatsApp. Baaki shows who
 owes money, predicts cash flow, and later gets an AI agent called Munshi.
 
