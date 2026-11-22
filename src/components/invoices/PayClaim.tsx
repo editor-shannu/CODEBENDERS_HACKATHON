@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Button, inputClass, labelClass } from "@/components/ui/Button";
 import { submitClaim } from "@/app/actions";
+import { HouseStatus } from "@/components/ui/HouseStatus";
 
 export function PayClaim({ token, balance, upi }: { token: string; balance: number; upi: string }) {
   const [open, setOpen] = useState(false);
@@ -11,9 +12,22 @@ export function PayClaim({ token, balance, upi }: { token: string; balance: numb
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  if (msg) return <p className="border border-lamp p-4 text-center font-mono text-sm text-dusk-deep">{msg}</p>;
+  // The house's window lights as soon as the parent says they've paid.
+  const house = (
+    <div className="flex justify-center">
+      <HouseStatus status={open || msg ? "paid" : "owed"} size={56} />
+    </div>
+  );
+  if (msg)
+    return (
+      <div className="space-y-3">
+        {house}
+        <p className="border border-lamp p-4 text-center font-mono text-sm text-dusk-deep">{msg}</p>
+      </div>
+    );
   return (
     <div className="space-y-3">
+      {house}
       <a href={upi} className="flex min-h-12 w-full items-center justify-center border border-brick bg-brick font-mono text-xs font-semibold uppercase tracking-[0.12em] text-plaster md:hidden">
         Pay with UPI app
       </a>

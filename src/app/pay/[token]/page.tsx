@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { Eyebrow } from "@/components/ui/Card";
 import { Stamp } from "@/components/ui/Stamp";
+import { HouseStatus } from "@/components/ui/HouseStatus";
 import { Guard } from "@/components/setup/Guard";
 import { PayClaim } from "@/components/invoices/PayClaim";
 import { db } from "@/lib/db";
@@ -36,6 +37,9 @@ export default async function PayPage({ params }: { params: Promise<{ token: str
               <p className="text-sm text-dusk-deep/70">for {kids}</p>
               {bal === 0 ? (
                 <div className="my-8 text-center">
+                  <div className="mb-4 flex justify-center">
+                    <HouseStatus status="paid" size={56} />
+                  </div>
                   <Stamp kind="PAID" className="text-3xl" />
                   <p className="mt-4 font-mono text-sm">Fully paid. Thank you!</p>
                 </div>
@@ -51,7 +55,12 @@ export default async function PayPage({ params }: { params: Promise<{ token: str
                     </div>
                   )}
                   {inv.claims.length > 0 ? (
-                    <p className="border border-lamp p-3 text-center font-mono text-sm">We got your payment note. {settings.tutorName.split(" ")[0]} garu will confirm soon.</p>
+                    <div className="space-y-3">
+                      <div className="flex justify-center">
+                        <HouseStatus status="promised" size={56} />
+                      </div>
+                      <p className="border border-lamp p-3 text-center font-mono text-sm">We got your payment note. {settings.tutorName.split(" ")[0]} garu will confirm soon.</p>
+                    </div>
                   ) : (
                     <PayClaim token={token} balance={bal} upi={upi} />
                   )}

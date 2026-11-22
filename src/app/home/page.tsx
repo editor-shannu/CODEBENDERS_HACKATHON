@@ -10,6 +10,7 @@ import { dbHealth } from "@/lib/db-health";
 import { SetupNotice } from "@/components/setup/SetupNotice";
 import { formatDate, fromKey, daysBetween, toKey } from "@/lib/dates";
 import { formatINR } from "@/lib/money";
+import { HouseStatus, houseStatusOf } from "@/components/ui/HouseStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,11 @@ export default async function HomePage() {
               <p className="mt-3 font-mono text-sm text-plaster/70">
                 <span className="text-brick">{formatINR(overdueTotal)} overdue</span> across {owing.length} families
               </p>
+              <div className="mt-3 flex flex-wrap gap-1" aria-label="Fee status, one house per family">
+                {families.map((f) => (
+                  <HouseStatus key={f.id} status={houseStatusOf(f.stats.balance, !!f.stats.openPromise)} size={20} label={`${f.parentName}: ${f.stats.balance > 0 ? (f.stats.openPromise ? "promised" : "owes") : "paid"}`} />
+                ))}
+              </div>
             </div>
             <p className="font-mono text-xs uppercase tracking-widest text-lamp">Who owes →</p>
           </Card>
