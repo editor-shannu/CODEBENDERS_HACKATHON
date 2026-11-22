@@ -8,16 +8,16 @@ type Props = {
   as?: "div" | "section" | "article" | "li";
 };
 
-/** Ledger Noir card: cream ruled paper with a red margin line, or ink with a hairline. */
+/** Baaki card: flat plaster paper, or dusk-deep with a hairline. */
 export function Card({ children, className = "", variant = "ledger", ruled = true, as: Tag = "div" }: Props) {
   const base =
     variant === "ledger"
-      ? `${ruled ? "ruled-paper" : "bg-ledger pl-5"} text-ink border border-ink/15`
+      ? `${ruled ? "bg-plaster" : "bg-plaster pl-5"} text-dusk-deep border border-dusk-deep/15`
       : variant === "khata"
-        ? "bg-khata text-ledger border border-khata"
+        ? "bg-slate-mute text-dusk-deep border border-slate-mute"
         : variant === "turmeric"
-          ? "bg-turmeric text-ink border border-turmeric"
-          : "bg-ink text-ledger border border-ledger/20";
+          ? "bg-lamp text-dusk-deep border border-lamp"
+          : "bg-dusk-deep text-plaster border border-plaster/20";
   return <Tag className={`relative ${base} p-4 pr-4 ${className}`}>{children}</Tag>;
 }
 
@@ -27,9 +27,9 @@ export function Eyebrow({ children, className = "" }: { children: ReactNode; cla
 
 export function PageHeader({ title, kicker, children }: { title: string; kicker?: string; children?: ReactNode }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-ledger/15 pb-4">
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b border-plaster/15 pb-4">
       <div>
-        {kicker && <Eyebrow className="text-turmeric opacity-100">{kicker}</Eyebrow>}
+        {kicker && <Eyebrow className="text-lamp opacity-100">{kicker}</Eyebrow>}
         <h1 className="font-display text-4xl leading-none tracking-tight md:text-5xl">{title}</h1>
       </div>
       {children}

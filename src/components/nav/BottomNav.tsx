@@ -17,7 +17,7 @@ export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="no-print fixed inset-x-0 bottom-0 z-50 border-t border-ledger/20 bg-ink pb-[env(safe-area-inset-bottom)]">
+    <nav className="no-print fixed inset-x-0 bottom-0 z-50 border-t border-plaster/20 bg-dusk pb-[env(safe-area-inset-bottom)]">
       <ul className="mx-auto flex w-full max-w-5xl justify-around">
         {LINKS.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -26,8 +26,8 @@ export default function BottomNav() {
               <Link
                 href={href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] uppercase tracking-wider sm:text-xs ${
-                  active ? "text-turmeric" : "text-ledger/70"
+                className={`flex min-h-14 min-w-11 flex-col items-center justify-center gap-1 text-[10px] uppercase tracking-wider sm:text-xs ${
+                  active ? "text-lamp" : "text-plaster/70"
                 }`}
               >
                 <Icon className="size-5" aria-hidden="true" />
