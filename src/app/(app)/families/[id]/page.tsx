@@ -10,6 +10,7 @@ import { RemindButton } from "@/components/actions/RemindButton";
 import { RecordPaymentButton } from "@/components/actions/RecordPayment";
 import { AddPromiseButton } from "@/components/actions/AddPromise";
 import { FamilyEditButton } from "@/components/families/FamilyEdit";
+import { NewInvoiceButton } from "@/components/invoices/InvoiceActions";
 import { loadDashboard } from "@/lib/board-view";
 import { balanceOf, isOverdue } from "@/lib/invoice-status";
 import { formatDate, formatMonth, relativeDue, toKey } from "@/lib/dates";
@@ -40,6 +41,7 @@ export default async function FamilyPage({ params }: { params: Promise<{ id: str
                 <HouseStatus status={houseStatusOf(f.stats.balance, !!f.stats.openPromise)} size={44} />
                 <FamilyEditButton f={f} />
                 <LinkButton href={`/students/new?family=${f.id}`} variant="ghost">Add sibling</LinkButton>
+                <NewInvoiceButton familyId={f.id} month={monthKey(today)} />
               </div>
             </PageHeader>
 

@@ -4,7 +4,7 @@ import { HouseStatus, houseStatusOf } from "@/components/ui/HouseStatus";
 import { MoneyText } from "@/components/ui/MoneyText";
 import { Stamp } from "@/components/ui/Stamp";
 import { Guard } from "@/components/setup/Guard";
-import { ClaimButtons, GenerateInvoicesButton, IssueDraftsButton } from "@/components/invoices/InvoiceActions";
+import { ClaimButtons, GenerateInvoicesButton, IssueDraftsButton, NewInvoiceButton } from "@/components/invoices/InvoiceActions";
 import { db } from "@/lib/db";
 import { balanceOf, isOverdue } from "@/lib/invoice-status";
 import { formatDate, formatMonth, monthKey, relativeDue, todayIST } from "@/lib/dates";
@@ -33,6 +33,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
         ]);
         const openPromise = new Set((await db.payPromise.findMany({ where: { kept: null }, select: { familyId: true } })).map((p) => p.familyId));
         const months = [...new Set(invoices.map((i) => i.month))];
+        const famList = (await db.family.findMany({ select: { id: true, parentName: true }, orderBy: { parentName: "asc" } })).map((f) => ({ id: f.id, name: f.parentName }));
         const list = invoices
           .filter((i) => !month || i.month === month)
           .filter((i) => {
@@ -50,6 +51,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
         return (
           <div>
             <PageHeader title="Invoices" kicker={`${list.length} shown · ${formatINR(due)} due`}>
+              <NewInvoiceButton families={famList} month={monthKey(today)} />
               <GenerateInvoicesButton />
               {drafts.length > 0 && <IssueDraftsButton label={`Issue all ${drafts.length}`} />}
             </PageHeader>

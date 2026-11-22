@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
-import { confirmClaim, generateMonthInvoices, issueDrafts, rejectClaim } from "@/app/actions";
+import { useRouter } from "next/navigation";
+import { confirmClaim, createSingleInvoice, generateMonthInvoices, issueDrafts, rejectClaim } from "@/app/actions";
 
 export function GenerateInvoicesButton() {
   const [msg, setMsg] = useState<string | null>(null);
@@ -50,5 +51,34 @@ export function CopyButton({ text, label = "Copy pay link" }: { text: string; la
     <Button variant="ghost" className="no-print" onClick={async () => { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1500); }}>
       {done ? "Copied" : label}
     </Button>
+  );
+}
+
+/** "New invoice": one family, month defaults to the current one; opens the invoice when saved. */
+export function NewInvoiceButton({ families, familyId, month }: { families?: { id: string; name: string }[]; familyId?: string; month: string }) {
+  const [open, setOpen] = useState(false);
+  const [fam, setFam] = useState(familyId ?? "");
+  const [m, setM] = useState(month);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  if (!open) return <Button variant="ghost" onClick={() => setOpen(true)}>New invoice</Button>;
+  return (
+    <div className="flex flex-wrap items-center gap-2 border border-plaster/25 p-2">
+      {!familyId && (
+        <select aria-label="Family" value={fam} onChange={(e) => setFam(e.target.value)} className="min-h-10 border border-plaster/25 bg-dusk-deep px-2 text-sm text-plaster">
+          <option value="">Pick a family</option>
+          {families?.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+        </select>
+      )}
+      <input aria-label="Month" type="month" value={m} onChange={(e) => setM(e.target.value)} className="min-h-10 border border-plaster/25 bg-dusk-deep px-2 font-mono text-sm text-plaster" />
+      <Button variant="lamp" disabled={pending || !fam} onClick={() => start(async () => {
+        const r = await createSingleInvoice({ familyId: fam, month: m });
+        if (r.ok && r.id) router.push(`/invoices/${r.id}`);
+        else setMsg(r.ok ? "Done" : r.error);
+      })}>{pending ? "Creating…" : "Create invoice"}</Button>
+      <Button variant="ghost" onClick={() => { setOpen(false); setMsg(null); }}>Cancel</Button>
+      {msg && <span className="w-full font-mono text-xs text-plaster/80">{msg}</span>}
+    </div>
   );
 }

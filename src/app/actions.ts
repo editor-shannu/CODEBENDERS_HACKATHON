@@ -84,6 +84,19 @@ export async function generateMonthInvoices(): Promise<ActionResult> {
   return { ok: true, message: created ? `Created ${created} draft invoices. Check them, then Issue all.` : "This month's invoices already exist" };
 }
 
+/** One invoice for one family and month, issued at once so its pay link and UPI QR work. Blocks a duplicate. */
+export async function createSingleInvoice(input: { familyId: string; month: string }): Promise<ActionResult & { id?: string }> {
+  const month = /^\d{4}-\d{2}$/.test(input.month) ? input.month : monthKey(todayIST());
+  const fam = await db.family.findUnique({ where: { id: input.familyId }, select: { id: true, parentName: true } });
+  if (!fam) return { ok: false, error: "Pick a family" };
+  const existing = await db.invoice.findFirst({ where: { familyId: fam.id, month }, select: { id: true, number: true } });
+  if (existing) return { ok: false, error: `${fam.parentName} already has invoice ${existing.number} for ${month}.` };
+  const inv = await createInvoiceFor(fam.id, month, "SENT");
+  if (!inv) return { ok: false, error: `${fam.parentName} has no active students for ${month}.` };
+  refreshAll();
+  return { ok: true, id: inv.id, message: `Created ${inv.number}` };
+}
+
 /** Issues drafts: they start counting as owed and their pay links work. */
 export async function issueDrafts(input: { ids?: string[] } = {}): Promise<ActionResult> {
   const r = await db.invoice.updateMany({ where: { status: "DRAFT", ...(input.ids?.length ? { id: { in: input.ids } } : {}) }, data: { status: "SENT" } });
