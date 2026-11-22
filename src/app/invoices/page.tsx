@@ -7,7 +7,7 @@ import { Guard } from "@/components/setup/Guard";
 import { ClaimButtons, GenerateInvoicesButton, IssueDraftsButton } from "@/components/invoices/InvoiceActions";
 import { db } from "@/lib/db";
 import { balanceOf, isOverdue } from "@/lib/invoice-status";
-import { formatDate, formatMonth, relativeDue, todayIST } from "@/lib/dates";
+import { formatDate, formatMonth, monthKey, relativeDue, todayIST } from "@/lib/dates";
 import { formatINR } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +63,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
             {filter !== "claims" && (
               <div className="mb-4 flex flex-wrap gap-2">
                 <Link href={q(filter)} className={`font-mono text-[11px] ${!month ? "text-lamp" : "text-plaster/60"}`}>All months</Link>
+                <Link href={`/report/${month ?? monthKey(today)}`} className="font-mono text-[11px] text-plaster/60 underline hover:text-lamp">Report card</Link>
                 {months.map((m) => (
                   <Link key={m} href={q(filter, m)} className={`font-mono text-[11px] ${month === m ? "text-lamp" : "text-plaster/60"}`}>{formatMonth(m)}</Link>
                 ))}
