@@ -85,7 +85,7 @@ export function buildBrief(opts: { families: FamilyWithStats[]; today: Date; for
       type: "REMIND",
       familyId: f.id,
       title: `Chase ${f.parentName}: ${formatINR(s.balance)}, ${s.oldestDaysLate} days late`,
-      detail: `${toneWord(s.suggestedTone)[0].toUpperCase() + toneWord(s.suggestedTone).slice(1)} reminder in ${f.language === "te" ? "Telugu" : f.language === "hi" ? "Hindi" : "English"}${mem.bestTime ? `. Best time: ${mem.bestTime.toLowerCase()}` : ""}.`,
+      detail: `${toneWord(s.suggestedTone)[0].toUpperCase() + toneWord(s.suggestedTone).slice(1)} reminder in ${f.language === "te" ? "Telugu" : f.language === "hi" ? "Hindi" : "English"}${mem.bestTime ? `. Best time: ${mem.bestTime.toLowerCase()}` : ""}${learnedDay(mem) ? `. Usually pays around the ${ordinal(learnedDay(mem)!)}` : ""}.`,
       reason: `Chase score ${s.chaseScore}: ${why.join("; ")}.`,
       priority: 60 - idx * 5,
       payload: { tone: s.suggestedTone },
@@ -95,7 +95,10 @@ export function buildBrief(opts: { families: FamilyWithStats[]; today: Date; for
   for (const f of families) {
     const active = f.students.filter((s) => s.active);
     if (!active.length) continue;
-    const day = paydayPattern(f.stats.payDays, active[0].dueDay);
+    const mem = memoryOf(f);
+    const learned = learnedDay(mem);
+    const fromPayments = paydayPattern(f.stats.payDays, active[0].dueDay);
+    const day = fromPayments ?? (learned && Math.abs(learned - active[0].dueDay) >= 3 ? learned : null);
     if (!day) continue;
     items.push({
       key: `payday-${f.id}`,
@@ -103,13 +106,22 @@ export function buildBrief(opts: { families: FamilyWithStats[]; today: Date; for
       familyId: f.id,
       title: `Move ${f.parentName.split(" ")[0]}'s due date from the ${ordinal(active[0].dueDay)} to the ${ordinal(day)}`,
       detail: `They pay on the ${ordinal(day)} almost every month.`,
-      reason: `Last ${Math.min(4, f.stats.payDays.length)} payments landed on the ${f.stats.payDays.slice(-4).map(ordinal).join(", ")}. Matching their payday stops them showing as late and saves you a reminder.`,
+      reason: fromPayments
+        ? `Last ${Math.min(4, f.stats.payDays.length)} payments landed on the ${f.stats.payDays.slice(-4).map(ordinal).join(", ")}. Matching their payday stops them showing as late and saves you a reminder.`
+        : `Munshi learned: ${mem.salaryDay ?? `usual pay day ${mem.usualPayDay}`}. Matching it stops them showing as late.`,
       priority: 40,
       payload: { dueDay: day },
     });
   }
 
   return items.sort((a, b) => b.priority - a.priority);
+}
+
+/** Pay day Munshi learned for a family (salary day first, then usual pay day). */
+export function learnedDay(mem: Record<string, string>): number | null {
+  const v = mem.salaryDay?.match(/(\d{1,2})(st|nd|rd|th)/)?.[1] ?? mem.usualPayDay;
+  const n = v ? parseInt(v, 10) : NaN;
+  return n >= 1 && n <= 28 ? n : null;
 }
 
 export function ordinal(n: number): string {

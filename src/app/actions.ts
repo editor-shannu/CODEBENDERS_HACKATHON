@@ -9,6 +9,7 @@ import { sumPaid } from "@/lib/invoice-status";
 import { seedDemo } from "@/lib/seed-data";
 import { settlePlanForBill, settlePlanForPayment } from "@/lib/munshi/plan";
 import { recalcInvoice } from "@/lib/invoices";
+import { learnFromHistory, learnFromReply } from "@/lib/munshi/memory";
 import { billSchema, claimSchema, paymentSchema, promiseSchema, settingsSchema, studentSchema } from "@/lib/validators";
 
 export type ActionResult = { ok: true; message?: string; status?: string } | { ok: false; error: string };
@@ -26,6 +27,7 @@ export async function recordPayment(input: { invoiceId: string; amount: number; 
   await db.payment.create({ data: { invoiceId, amount, mode, reference: reference || null, date: fromKey(date) } });
   const status = await recalcInvoice(invoiceId);
   await settlePlanForPayment(inv.familyId, amount);
+  await learnFromHistory(inv.familyId);
   refreshAll();
   return { ok: true, status };
 }
@@ -200,6 +202,7 @@ export async function confirmClaim(id: string): Promise<ActionResult> {
   await db.paymentClaim.update({ where: { id }, data: { status: "CONFIRMED" } });
   const status = await recalcInvoice(claim.invoiceId);
   await settlePlanForPayment(claim.invoice.familyId, paid);
+  await learnFromHistory(claim.invoice.familyId);
   refreshAll();
   return { ok: true, status };
 }
@@ -298,6 +301,7 @@ export async function readReplyAction(familyId: string, text: string) {
   const today = todayIST();
   const balance = familyStats(f, today).balance;
   const r = await parseReply(text.trim(), today, balance, f.parentName);
+  await learnFromReply(familyId, text.trim(), r.promisedDate);
   await db.agentAction.create({ data: { type: "NOTE", familyId, title: `Read reply from ${f.parentName}`, detail: text.slice(0, 200), reason: r.summary, status: "DONE", source: r.source } });
   refreshAll();
   return { ok: true as const, result: r, balance };

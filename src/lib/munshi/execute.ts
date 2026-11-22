@@ -4,6 +4,7 @@ import { fromKey, monthKey, todayIST, toKey } from "../dates";
 import { sumPaid } from "../invoice-status";
 import { createInvoiceFor, recalcInvoice } from "../invoices";
 import { settlePlanForPayment } from "./plan";
+import { learnFromHistory } from "./memory";
 
 /**
  * Munshi's write actions. Every write tool lands here, either straight away (low-risk work the
@@ -63,6 +64,7 @@ export async function performAction(type: string, familyId: string | null, paylo
       }
       const paid = Math.round(Number(payload.amount ?? 0)) - left;
       await settlePlanForPayment(familyId, paid);
+      await learnFromHistory(familyId);
       return `Payment of ${paid} recorded`;
     }
     case "DUE_DATE": {

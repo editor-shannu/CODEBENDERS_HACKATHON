@@ -4,7 +4,9 @@ import { todayIST, toKey } from "./dates";
 import { familyStats, type FamilyLite, type FamilyStats } from "./family-stats";
 import type { ForecastInput } from "./forecast";
 import { balanceOf } from "./invoice-status";
-import { formatDate, formatMonthShort, addDays } from "./dates";
+import { formatDate, formatMonthShort, addDays, daysBetween, nextDayOfMonth } from "./dates";
+import { memoryOf } from "./munshi/rules";
+import { usualDayOf } from "./munshi/memory";
 import { formatINR } from "./money";
 import { kidsLabel } from "./messages";
 
@@ -44,6 +46,8 @@ async function settlePromises(today: Date) {
   const open = await db.payPromise.findMany({ where: { kept: null, promisedDate: { lt: today } } });
   if (!open.length) return;
   for (const p of open) await db.payPromise.update({ where: { id: p.id }, data: { kept: false } });
+  const { learnFromHistory } = await import("./munshi/memory");
+  for (const id of new Set(open.map((p) => p.familyId))) await learnFromHistory(id);
 }
 
 export async function loadBoard() {
@@ -107,6 +111,17 @@ export type ReminderPayload = {
   tutor: string;
 };
 
+/** "Please pay by" date: the family's learned pay day when it falls in the next 3 to 10 days, else 3 days out. */
+export function reminderBy(f: { memory: string }, today: Date): Date {
+  const day = usualDayOf(memoryOf(f));
+  if (day) {
+    const next = nextDayOfMonth(today, day);
+    const d = daysBetween(today, next);
+    if (d >= 3 && d <= 10) return next;
+  }
+  return addDays(today, 3);
+}
+
 export function reminderPayload(f: FamilyWithStats, settings: { centreName: string; tutorName: string }, today: Date): ReminderPayload {
   const months = [...new Set(f.stats.unpaid.map((i) => formatMonthShort(i.month)))];
   const monthsLabel = months.length > 1 ? `${months.slice(0, -1).join(", ")} & ${months[months.length - 1]}` : months[0] ?? "";
@@ -119,7 +134,7 @@ export function reminderPayload(f: FamilyWithStats, settings: { centreName: stri
     amount: formatINR(f.stats.balance),
     months: monthsLabel,
     days: f.stats.oldestDaysLate,
-    by: formatDate(addDays(today, 3), { weekday: false, year: false }),
+    by: formatDate(reminderBy(f, today), { weekday: false, year: false }),
     token: f.stats.unpaid[0]?.payToken ?? null,
     suggestedTone: f.stats.suggestedTone,
     centre: settings.centreName,
