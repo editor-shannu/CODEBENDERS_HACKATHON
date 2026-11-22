@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatINR } from "@/lib/money";
-import { LanePoster } from "./LanePoster";
+import { LaneStage, type StageControl } from "./LaneStage";
 import { chaptersFor, type LandingData } from "./landing-data";
 
 /**
@@ -16,11 +16,18 @@ export function Landing({ data }: { data: LandingData }) {
   const [active, setActive] = useState(0);
   const refs = useRef<(HTMLElement | null)[]>([]);
   const router = useRouter();
+  const progress = useRef(0);
+  const dive = useRef<number | null>(null);
+  const control = useMemo<StageControl>(() => ({ progress, dive }), []);
 
   useEffect(() => {
     const io = new IntersectionObserver(
       (entries) => {
-        for (const e of entries) if (e.isIntersecting) setActive(Number((e.target as HTMLElement).dataset.index));
+        for (const e of entries) if (e.isIntersecting) {
+          const i = Number((e.target as HTMLElement).dataset.index);
+          setActive(i);
+          progress.current = i;
+        }
       },
       { rootMargin: "-45% 0px -45% 0px" },
     );
@@ -40,9 +47,7 @@ export function Landing({ data }: { data: LandingData }) {
         Skip to dashboard
       </Link>
 
-      <div className="sticky top-0 h-dvh w-full overflow-hidden" aria-hidden="true">
-        <LanePoster data={data} chapter={active} />
-      </div>
+      <LaneStage data={data} chapter={active} control={control} />
 
       <div className="relative z-10 -mt-[100dvh]">
         {chapters.map((c, i) => (
