@@ -120,8 +120,8 @@ export function ChatImport({ initialText = "" }: { initialText?: string }) {
             {r.include && (
               <div className="mt-2 space-y-2 pl-8">
                 {r.kids.map((k, n) => (
-                  <div key={n} className="grid grid-cols-[1fr_8rem_6rem] gap-2">
-                    <input aria-label="Child name" className={inputClass} value={k.name} placeholder="Child's name" onChange={(e) => setKid(i, n, { name: e.target.value })} />
+                  <div key={n} className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_8rem_6rem]">
+                    <input aria-label="Child name" className={`${inputClass} col-span-2 sm:col-span-1`} value={k.name} placeholder="Child's name" onChange={(e) => setKid(i, n, { name: e.target.value })} />
                     <input aria-label="Class" className={inputClass} value={k.batch} placeholder="Class" onChange={(e) => setKid(i, n, { batch: e.target.value })} />
                     <input aria-label="Fee per month" type="number" className={inputClass} value={k.fee} onChange={(e) => setKid(i, n, { fee: Number(e.target.value) })} />
                   </div>
@@ -139,7 +139,7 @@ export function ChatImport({ initialText = "" }: { initialText?: string }) {
       </div>
 
       {err && <p role="alert" className="font-mono text-xs text-brick">{err}</p>}
-      <div className="sticky bottom-20 flex flex-wrap items-center gap-3 border border-dusk-deep/20 bg-plaster p-3">
+      <div className="sticky bottom-36 flex flex-wrap items-center gap-3 border border-dusk-deep/20 bg-plaster p-3">
         <Button
           disabled={pending || !chosen.length}
           onClick={() =>

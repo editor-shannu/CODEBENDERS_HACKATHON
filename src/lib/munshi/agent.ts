@@ -6,7 +6,8 @@ import { runForecast, type ForecastInput, type ForecastResult, type WhatIf } fro
 import type { Tone } from "../family-stats";
 import { reminderText, waLink } from "../messages";
 import { memoryOf, ordinal } from "./rules";
-import { proposeOrRun, type WriteType } from "./execute";
+import { MONEY, proposeOrRun, runNow, type WriteType } from "./execute";
+import { db } from "../db";
 import { allowedAmounts, checkAmounts, isThreatening, numbersIn } from "./guardrails";
 
 /* ------------------------------------------------------------------ */
@@ -134,7 +135,8 @@ export type TraceStep = { kind: "think" | "tool" | "result" | "answer"; text: st
 export type ChartData =
   | { kind: "cash"; title: string; points: { date: string; before: number; after: number }[] }
   | { kind: "owed"; title: string; bars: { name: string; owed: number }[] };
-export type AskResult = { answer: string; trace: TraceStep[]; source: "AI" | "RULES"; chart?: ChartData; actions?: { title: string; status: string }[] };
+export type ChatLink = { label: string; url: string; kind: "whatsapp" | "page" };
+export type AskResult = { answer: string; trace: TraceStep[]; source: "AI" | "RULES"; chart?: ChartData; actions?: { title: string; status: string }[]; links?: ChatLink[] };
 
 export type Ctx = {
   families: FamilyWithStats[];
@@ -146,9 +148,14 @@ export type Ctx = {
   centreName: string;
   tutorName: string;
   origin: string;
+  /** The tutor typed this as an instruction in the Munshi chat: their own words are the approval. */
+  direct?: boolean;
+  question?: string;
 };
 
-type ToolOut = { result: unknown; chart?: ChartData; action?: { title: string; status: string } };
+type ToolOut = { result: unknown; chart?: ChartData; action?: { title: string; status: string }; links?: ChatLink[] };
+
+const SAID_PAID = /\b(paid|pay chesaru|received|got|gave|collected|ichharu|icharu|ichadu|kattaru|kattadu|diya|de diya|jama|credited|cash|upi|gpay|phonepe)\b/i;
 
 function findFamily(ctx: Ctx, name: unknown) {
   const q = String(name ?? "").toLowerCase().trim();
@@ -162,6 +169,12 @@ const isoDay = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.t
 async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx, source: "AI" | "RULES"): Promise<ToolOut> {
   const owing = ctx.families.filter((f) => f.stats.balance > 0);
   const write = async (type: WriteType, familyId: string | null, title: string, payload: Record<string, unknown>, reason = "") => {
+    // A direct instruction from the tutor runs now. Money only when the tutor's own words said they were paid.
+    const told = ctx.direct && (!MONEY.includes(type) || (type === "PAYMENT" ? SAID_PAID.test(ctx.question ?? "") : /\b(invoice|bill|due)\b/i.test(ctx.question ?? "")));
+    if (told) {
+      const r = await runNow({ type, familyId, title, payload, reason, source });
+      return { id: r.id, status: "done", result: r.result };
+    }
     const r = await proposeOrRun({ type, familyId, title, payload, reason, autonomy: ctx.autonomy, source });
     return { id: r.id, status: r.status === "DONE" ? "done" : "waiting for your approval", result: r.result };
   };
@@ -242,7 +255,8 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx, so
       const text = checkAmounts(raw, allowedAmounts(f));
       if (isThreatening(text)) return { result: { error: "Draft blocked by guardrail" } };
       const r = await write("REMIND", f.id, `Send a ${tone.toLowerCase()} reminder to ${f.parentName}`, { tone, language: f.language }, "Drafted by Munshi. Munshi never sends: you open WhatsApp and pick the chat.");
-      return { result: { draft: text, whatsapp: waLink(text), language: f.language, sent: false, ...r }, action: { title: `Reminder draft for ${f.parentName}`, status: r.status } };
+      if (ctx.direct) await db.reminder.create({ data: { familyId: f.id, tone, language: f.language, status: "SENT", note: "drafted in Munshi chat" } }).catch(() => {});
+      return { result: { draft: text, language: f.language, sent: false, ...r }, action: { title: `Reminder draft for ${f.parentName}`, status: r.status }, links: [{ label: `WhatsApp ${f.parentName.split(" ")[0]}`, url: waLink(text), kind: "whatsapp" }] };
     }
     case "schedule_nudge": {
       const f = findFamily(ctx, args.name);
@@ -294,6 +308,36 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx, so
       const r = await write("FLAG", f.id, `Risk flagged: ${f.parentName}`, { reason }, reason);
       return { result: { flagged: true, reason, ...r }, action: { title: `Flagged ${f.parentName}`, status: r.status } };
     }
+    case "remind_all_late": {
+      const tone = ["GENTLE", "FIRM", "FINAL"].includes(String(args.tone)) ? (String(args.tone) as Tone) : null;
+      const late = [...owing].filter((f) => f.stats.oldestDaysLate > 0).sort((a, b) => b.stats.chaseScore - a.stats.chaseScore).slice(0, Math.min(10, Number(args.limit ?? 8)));
+      const links: ChatLink[] = [];
+      const out = late.map((f) => {
+        const t = tone ?? f.stats.suggestedTone;
+        const p = reminderPayload(f, { centreName: ctx.centreName, tutorName: ctx.tutorName }, ctx.today);
+        const link = p.token ? `${ctx.origin}/pay/${p.token}` : ctx.origin;
+        const text = checkAmounts(reminderText(f.language, t, { parent: p.parent, kids: p.kids, centre: p.centre, tutor: p.tutor, amount: p.amount, months: p.months, days: p.days, by: p.by, link }), allowedAmounts(f));
+        links.push({ label: `${f.parentName.split(" ")[0]} · ${formatINR(f.stats.balance)}`, url: waLink(text), kind: "whatsapp" });
+        return { parent: f.parentName, owes: f.stats.balance, daysLate: f.stats.oldestDaysLate, tone: t, language: f.language };
+      });
+      return { result: { drafted: out.length, families: out, note: "One tap on each opens WhatsApp with the message ready. Munshi never sends by itself." }, links };
+    }
+    case "add_student": {
+      const child = String(args.child ?? "").trim().slice(0, 60);
+      const parent = String(args.parent ?? "").trim().slice(0, 60);
+      const fee = Math.round(Number(args.monthlyFee));
+      const dueDay = Math.round(Number(args.dueDay ?? 5)) || 5;
+      const batch = String(args.batch ?? "").trim().slice(0, 40) || "General";
+      if (child.length < 2) return { result: { error: "Need the child's name" } };
+      if (!(fee >= 100 && fee <= 50000)) return { result: { error: "Need the monthly fee (₹100 to ₹50,000)" } };
+      if (!ctx.direct) return { result: { error: "Only add students when the tutor asks in chat" } };
+      const existing = parent ? findFamily(ctx, parent) : undefined;
+      const lang = ["te", "en", "hi"].includes(String(args.language)) ? String(args.language) : "te";
+      const famId = existing?.id ?? (await db.family.create({ data: { parentName: parent || `${child.split(" ")[0]}'s parent`, language: lang, notes: "Added in Munshi chat" } })).id;
+      await db.student.create({ data: { familyId: famId, name: child, batch, monthlyFee: fee, dueDay: Math.min(28, Math.max(1, dueDay)) } });
+      await db.agentAction.create({ data: { type: "NOTE", familyId: famId, title: `Added ${child} (${batch}), ${formatINR(fee)}/month`, status: "DONE", source, reason: "You asked in chat" } });
+      return { result: { added: child, batch, monthlyFee: fee, dueDay, family: existing?.parentName ?? parent ?? null }, action: { title: `Added ${child}`, status: "done" }, links: [{ label: "Open family", url: `/families/${famId}`, kind: "page" }] };
+    }
     default:
       return { result: { error: "Unknown tool" } };
   }
@@ -316,6 +360,8 @@ export const TOOLS = [
   fn("propose_due_date_change", "Propose moving a family's monthly due day (1 to 28), needs approval", { name: S, dueDay: N, reason: S }, ["name", "dueDay"]),
   fn("create_invoice", "Create a DRAFT invoice for a family for a month (YYYY-MM), needs approval", { name: S, month: S }, ["name"]),
   fn("flag_risk", "Flag a family as a collection risk with a short reason", { name: S, reason: S }, ["name"]),
+  fn("remind_all_late", "Draft WhatsApp reminders for every late family at once, each in its own language, with one-tap send links", { tone: { type: "string", enum: ["GENTLE", "FIRM", "FINAL"] }, limit: N }),
+  fn("add_student", "Add a new student (and their family if new) when the tutor asks", { child: S, parent: S, batch: S, monthlyFee: N, dueDay: N, language: { type: "string", enum: ["te", "en", "hi"] } }, ["child", "monthlyFee"]),
 ];
 
 /* ---------- offline rules: keyword matching onto the same tools ---------- */
@@ -330,12 +376,14 @@ async function rulesAnswer(q: string, ctx: Ctx): Promise<AskResult> {
   const trace: TraceStep[] = [{ kind: "think", text: "Offline mode: matching the question to a known tool." }];
   let chart: ChartData | undefined;
   const actions: { title: string; status: string }[] = [];
+  const links: ChatLink[] = [];
   const call = async (name: string, args: Record<string, unknown> = {}) => {
     trace.push({ kind: "tool", text: `${name}(${JSON.stringify(args)})` });
     const r = await runTool(name, args, ctx, "RULES");
     trace.push({ kind: "result", text: JSON.stringify(r.result).slice(0, 300) });
     if (r.chart) chart = r.chart;
     if (r.action) actions.push(r.action);
+    if (r.links) links.push(...r.links);
     return r.result as never;
   };
   const named = ctx.families.find((f) => s.includes(f.parentName.split(" ")[0].toLowerCase()) || f.students.some((k) => s.includes(` ${k.name.split(" ")[0].toLowerCase()}`)));
@@ -343,8 +391,29 @@ async function rulesAnswer(q: string, ctx: Ctx): Promise<AskResult> {
   const when = () => parseReplyRules(q, ctx.today, named?.stats.balance ?? 0).promisedDate;
   const tone = /final|last/.test(s) ? "FINAL" : /firm|strict/.test(s) ? "FIRM" : /gentle|soft|polite/.test(s) ? "GENTLE" : undefined;
   let answer: string;
+  const addMatch = /\b(add|new student|admit|admission|join(?:ed)?)\b/.test(s) && !named ? q.match(/\b(?:add|admit|new student|admission for|joined?)\s+([A-Za-z][A-Za-z]+(?:\s[A-Z][a-z]+)?)/i) : null;
+  const lateWords = /(remind|chase|message|send)\s+(all|every|everyone|the late|late|pending)|remind (them )?all|send reminders|chase everyone|andariki|sabko/.test(s);
+  const whoOwes = /who (hasn'?t|has not|didn'?t|did not|not|is yet to) pa(id|y)|who owes|who is (pending|late)|evaru (ivvaledu|kattaledu)|kisne nahi|pending (list|families)|baaki list/.test(s);
 
-  if (/what if|what-if|suppose|scenario|\bif (i|we)\b|lose|drop ?out|raise|hike|new (student|admission)|admissions?|pay late|days late/.test(s) && !/(promise|paid|received)/.test(s)) {
+  if (addMatch) {
+    const child = addMatch[1].replace(/\b(student|the|a|my|class|std|in|to|fee|rs|for|mother|father|parent)\b/gi, "").replace(/\s+/g, " ").trim();
+    const cls = s.match(/\b(?:class|std)\s*(\d{1,2})\b/) ?? s.match(/\b(\d{1,2})(?:st|nd|rd|th)\s*(?:class|std)?\b/);
+    const parent = q.match(/\b(?:mother|father|parent|amma|nanna|mom|dad)\s+(?:is\s+)?([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/i)?.[1] ?? q.match(/\b(?:parent|mother|father)\s*:\s*([A-Za-z ]{2,40})/i)?.[1];
+    const fee = num(s, /(?:₹|rs\.?\s*|fee\s*)([\d,]{3,})/) || num(s, /\b(\d{3,5})\b(?!\s*(?:st|nd|rd|th))/);
+    const due = num(s, /due\s*(?:on|day)?\s*(\d{1,2})/);
+    if (!fee) answer = `What's ${child}'s monthly fee? Say it like "add ${child} class 8 ₹1500".`;
+    else {
+      const r = (await call("add_student", { child, parent: parent ?? "", batch: cls ? `Class ${cls[1]}` : "", monthlyFee: fee, ...(due ? { dueDay: due } : {}) })) as { added?: string; batch?: string; monthlyFee?: number; error?: string };
+      answer = r.added ? `Added ${r.added}${r.batch && r.batch !== "General" ? ` (${r.batch})` : ""} at ${formatINR(r.monthlyFee!)} a month.${parent ? "" : " Tell me the parent's name and I'll fix it on the family page."}` : r.error ?? "I couldn't add that.";
+    }
+  } else if (lateWords) {
+    const r = (await call("remind_all_late", tone ? { tone } : {})) as { drafted: number; families: { parent: string; owes: number; daysLate: number }[] };
+    answer = r.drafted ? `${r.drafted} reminders are ready, each in the family's own language with their pay link. Tap a name to send it on WhatsApp.` : "Nobody is late right now.";
+  } else if (whoOwes) {
+    const r = (await call("remind_all_late", {})) as { drafted: number; families: { parent: string; owes: number; daysLate: number }[] };
+    const tot = ctx.totalPending;
+    answer = r.drafted ? `${formatINR(tot)} is pending. Late: ${r.families.map((x) => `${x.parent.split(" ")[0]} ${formatINR(x.owes)} (${x.daysLate}d)`).join(", ")}. Tap a name to send their reminder.` : "Everyone has paid. Nothing pending.";
+  } else if (/what if|what-if|suppose|scenario|\bif (i|we)\b|lose|drop ?out|raise|hike|new (student|admission)|admissions?|pay late|days late/.test(s) && !/(promise|paid|received)/.test(s)) {
     const args: Record<string, unknown> = {};
     const late = num(s, /(\d+)\s*(?:more\s*)?days?\s*(?:late|delay)/);
     if (late) args.extraDelayDays = late;
@@ -376,7 +445,7 @@ async function rulesAnswer(q: string, ctx: Ctx): Promise<AskResult> {
   } else if (named && /\b(paid|received|got|gave|collected)\b/.test(s)) {
     const mode = /upi|gpay|phonepe|paytm/.test(s) ? "UPI" : "CASH";
     const r = (await call("log_payment", { name: named.parentName, amount: amount || named.stats.balance, mode })) as { amount?: number; status?: string; error?: string };
-    answer = r.amount ? `Payment of ${formatINR(r.amount)} from ${named.parentName} is ${r.status}. Money actions always need your tap.` : r.error ?? "I couldn't log that.";
+    answer = r.amount ? (r.status === "done" ? `Recorded ${formatINR(r.amount)} ${mode === "UPI" ? "UPI" : "cash"} from ${named.parentName}. ${named.parentName.split(" ")[0]} now owes ${formatINR(Math.max(0, named.stats.balance - r.amount))}.` : `Payment of ${formatINR(r.amount)} from ${named.parentName} is ${r.status}. Money actions need your tap.`) : r.error ?? "I couldn't log that.";
   } else if (named && /due (date|day)|move .*due|change .*due/.test(s)) {
     const day = num(s, /(\d{1,2})(?:st|nd|rd|th)?\b/);
     const r = (await call("propose_due_date_change", { name: named.parentName, dueDay: day })) as { dueDay?: number; status?: string; error?: string };
@@ -405,7 +474,7 @@ async function rulesAnswer(q: string, ctx: Ctx): Promise<AskResult> {
     answer = r.length ? `Chase these first: ${r.map((x) => `${x.parent} (${formatINR(x.owes)}, ${x.daysLate} days late)`).join("; ")}.` : "Nobody owes anything right now.";
   }
   trace.push({ kind: "answer", text: answer });
-  return { answer, trace, source: "RULES", chart, actions };
+  return { answer, trace, source: "RULES", chart, actions, links };
 }
 
 export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> {
@@ -413,6 +482,7 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
   const trace: TraceStep[] = [];
   let chart: ChartData | undefined;
   const actions: { title: string; status: string }[] = [];
+  const links: ChatLink[] = [];
   const results: unknown[] = [];
   const messages: Msg[] = [
     { role: "system", content: munshiSystemPrompt(ctx) },
@@ -430,6 +500,7 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
           const out = await runTool(tc.function.name, args, ctx, "AI");
           if (out.chart) chart = out.chart;
           if (out.action) actions.push(out.action);
+          if (out.links) links.push(...out.links);
           trace.push({ kind: "result", text: JSON.stringify(out.result).slice(0, 300) });
           results.push(out.result);
           messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(out.result) });
@@ -451,7 +522,7 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
         answer = `Done: ${actions.map((a) => `${a.title} (${a.status})`).join("; ")}.`;
       }
       trace.push({ kind: "answer", text: answer });
-      return { answer, trace, source: "AI", chart, actions };
+      return { answer, trace, source: "AI", chart, actions, links };
     }
     throw new Error("too many steps");
   } catch {
@@ -459,7 +530,7 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
       // writes already happened: don't repeat them through the rules
       const answer = `Done: ${actions.map((a) => `${a.title} (${a.status})`).join("; ")}.`;
       trace.push({ kind: "answer", text: answer });
-      return { answer, trace, source: "AI", chart, actions };
+      return { answer, trace, source: "AI", chart, actions, links };
     }
     const r = await rulesAnswer(question, ctx);
     r.trace.unshift({ kind: "think", text: "AI unavailable, switched to offline rules." });
@@ -468,14 +539,16 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
 }
 
 /** Munshi's system prompt (also quoted in the README). */
-export function munshiSystemPrompt(ctx: Pick<Ctx, "today" | "centreName" | "autonomy">): string {
+export function munshiSystemPrompt(ctx: Pick<Ctx, "today" | "centreName" | "autonomy" | "direct">): string {
   return [
-    `You are Munshi, the back-office clerk for ${ctx.centreName}, a home tuition centre in Hyderabad, India. Today is ${formatDate(ctx.today)} (IST).`,
+    `You are Munshi, the back-office clerk for ${ctx.centreName}, a home tuition centre in India. Today is ${formatDate(ctx.today)} (IST).`,
     "Use the tools to look up real numbers before answering. Every amount and date you state must come from a tool result in this conversation; never invent or estimate one.",
     "Answer in 1 to 3 short sentences, amounts in rupees with Indian grouping (₹14,500).",
     "Be practical and kind about parents. Never threaten, shame, or pressure a family, and never suggest stopping a child's classes as a punishment.",
     "Never share one family's fees, promises or notes in a message meant for another family.",
     "Reminders are drafts in the family's own language (te, hi or en); you never send them. The tutor sends from WhatsApp.",
-    `The autonomy dial is ${ctx.autonomy}. Write tools may land in the approval inbox; say so when they do. Money actions (payments, invoices, due dates) always wait for the tutor.`,
+    ctx.direct
+      ? "The tutor is typing to you in chat. Treat clear instructions as done: \"Ravi paid 1500 cash\" means call log_payment; \"add Sita class 8 1200\" means add_student; \"remind all late\" or \"who hasn't paid\" means remind_all_late. The tutor may write in English, Telugu, Hindi, Tenglish or Hinglish. Ask one short question only when a required detail (amount, fee, date) is missing."
+      : `The autonomy dial is ${ctx.autonomy}. Write tools may land in the approval inbox; say so when they do. Money actions (payments, invoices, due dates) always wait for the tutor.`,
   ].join(" ");
 }

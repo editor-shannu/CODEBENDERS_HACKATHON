@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { requireTutor } from "@/lib/auth/session";
 import { isDemoEmail } from "@/lib/demo";
 import { DemoBanner } from "@/components/demo/DemoBanner";
+import { MunshiChat } from "@/components/munshi/MunshiChat";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,8 @@ export default async function TutorLayout({ children }: { children: ReactNode })
     <>
       {isDemoEmail(user.email) && <DemoBanner />}
       {children}
+      <div className="h-20" aria-hidden="true" />
+      <MunshiChat />
     </>
   );
 }

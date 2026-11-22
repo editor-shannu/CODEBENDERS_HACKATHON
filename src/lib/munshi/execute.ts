@@ -104,6 +104,15 @@ export async function proposeOrRun(input: { type: WriteType; familyId: string | 
   return { id: action.id, status: auto ? ("DONE" as const) : ("PENDING" as const), result };
 }
 
+/** The tutor told Munshi to do it in chat ("Ravi paid 1500 cash"): carry it out now and log it as done. */
+export async function runNow(input: { type: WriteType; familyId: string | null; title: string; reason?: string; payload: Record<string, unknown>; source: "AI" | "RULES" }) {
+  const result = await performAction(input.type, input.familyId, input.payload);
+  const action = await db.agentAction.create({
+    data: { type: input.type, familyId: input.familyId, title: input.title, detail: result, reason: input.reason || "You asked in chat", payload: JSON.stringify(input.payload), status: "DONE", source: input.source },
+  });
+  return { id: action.id, status: "DONE" as const, result };
+}
+
 /** Approving an inbox action carries it out (money actions included, since the tutor approved them). */
 export async function approveAction(id: string) {
   const a = await db.agentAction.findUnique({ where: { id } });

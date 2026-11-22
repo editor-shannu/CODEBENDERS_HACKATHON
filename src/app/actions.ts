@@ -310,7 +310,7 @@ export async function readReplyAction(familyId: string, text: string) {
   return { ok: true as const, result: r, balance, scheduled };
 }
 
-export async function askMunshiAction(question: string) {
+export async function askMunshiAction(question: string, opts: { direct?: boolean } = {}) {
   if (!question.trim()) return { ok: false as const, error: "Ask a question" };
   const { askMunshi } = await import("@/lib/munshi/agent");
   const { loadDashboard } = await import("@/lib/board-view");
@@ -326,8 +326,10 @@ export async function askMunshiAction(question: string) {
     centreName: board.settings.centreName,
     tutorName: board.settings.tutorName,
     origin: await getOrigin(),
+    direct: !!opts.direct,
+    question: question.trim().slice(0, 500),
   });
-  if (r.actions?.length) refreshAll();
+  if (r.actions?.length || r.links?.length) refreshAll();
   return { ok: true as const, ...r };
 }
 

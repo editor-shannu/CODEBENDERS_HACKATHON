@@ -129,6 +129,9 @@ export function Landing({ data }: { data: LandingData }) {
       >
         {data.viewer ? "Open dashboard" : "Sign in"}
       </Link>
+      <Link href="/pricing" className="absolute right-3 top-[7.25rem] z-30 inline-flex min-h-9 items-center px-3 font-mono text-[11px] uppercase tracking-[0.14em] text-plaster/80 hover:text-lamp md:right-[290px] md:top-4">
+        Pricing
+      </Link>
       {!data.viewer && (
         <a
           href="/api/demo"

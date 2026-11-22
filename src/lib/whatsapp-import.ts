@@ -79,6 +79,8 @@ const KID_PATTERNS = [
   new RegExp(`\\b${NAME}\\s+(?:is\\s+)?(?:absent|sick|unwell|will not come|won't come|raadu|raledu|ki fever|ko fever|homework)`),
   new RegExp(`\\bfor\\s+${NAME}(?:'s)?\\s+(?:fee|fees|tuition)`),
   new RegExp(`\\b${NAME}(?:'s)?\\s+(?:fee|fees|tuition)\\b`),
+  new RegExp(`\\b${NAME}\\s+(?:\\d{1,2}(?:st|nd|rd|th)\\s*(?:class|std)|(?:class|std)\\s*\\d{1,2})`),
+  new RegExp(`\\bfor\\s+${NAME}\\b`),
 ];
 const NOT_NAMES = new Set(["Sir", "Madam", "Mam", "Maam", "Teacher", "Good", "Thank", "Thanks", "Ok", "Okay", "Yes", "No", "Hi", "Hello", "Namaste", "Today", "Tomorrow", "The", "This", "Fee", "Fees", "Class", "Please", "Gpay", "Phonepe", "Paytm", "Done", "Sent", "Paid", "My", "Our", "Next", "Last", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Garu", "Gaaru", "Ji", "Bhai", "Anna", "Akka"]);
 
@@ -151,7 +153,8 @@ export function buildCandidates(messages: ChatMessage[], tutor: string | null): 
       promiseText = null;
       promiseAt = null;
     }
-    const parentName = looksLikePhone(sender) ? `Parent ${sender.replace(/\D/g, "").slice(-4)}` : sender.replace(/\s*\(.*?\)\s*/g, " ").trim();
+    const selfName = msgs.map((m) => /\b(?:[Ii] am|[Ii]'m|[Tt]his is|[Mm]yself|[Nn]enu|[Mm]ain)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/.exec(m.text)?.[1]).find((n) => n && !NOT_NAMES.has(n.split(" ")[0]) && !kidNames.includes(n));
+    const parentName = looksLikePhone(sender) ? (selfName ?? `Parent ${sender.replace(/\D/g, "").slice(-4)}`) : sender.replace(/\s*\(.*?\)\s*/g, " ").trim();
     out.push({
       sender,
       parentName,

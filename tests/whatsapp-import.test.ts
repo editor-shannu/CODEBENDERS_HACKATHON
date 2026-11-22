@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCandidates, guessTutor, parseChat } from "../src/lib/whatsapp-import";
+import { buildCandidates, guessTutor, kidsIn, parseChat } from "../src/lib/whatsapp-import";
 
 const ANDROID = `02/11/26, 7:01 pm - Messages and calls are end-to-end encrypted.
 02/11/26, 7:05 pm - Lakshmi Madam: Namaste parents, November fee is due by 5th. Please pay by GPay.
@@ -49,5 +49,15 @@ describe("WhatsApp import", () => {
     expect(rafi.kids[0]).toEqual({ name: "Ayaan", batch: "Class 8" });
     expect(rafi.payments[0].amount).toBe(2400);
     expect(rafi.language).toBe("hi");
+  });
+
+  it("finds children named next to their class, and a parent who introduces themself", () => {
+    expect(kidsIn("Madam fee sent 2200 by phonepe for Pranav 8th class")).toContain("Pranav");
+    expect(kidsIn("Madam Ishaan 6th class fee 1800 will pay on friday")).toContain("Ishaan");
+    expect(kidsIn("Hi madam, I am Meena, Arjun's mother. Arjun 9th class")).toEqual(["Arjun"]);
+    const msgs = parseChat("03/11/26, 8:05 pm - +91 98480 12345: Hi madam, I am Meena, Arjun's mother. Arjun 9th class");
+    const [c] = buildCandidates(msgs, null);
+    expect(c.parentName).toBe("Meena");
+    expect(c.kids[0]).toEqual({ name: "Arjun", batch: "Class 9" });
   });
 });
