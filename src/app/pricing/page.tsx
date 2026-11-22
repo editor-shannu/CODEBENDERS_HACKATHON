@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getSessionUser } from "@/lib/auth/session";
 import { PlanPicker } from "@/components/billing/PlanPicker";
+import { razorpayEnabled, razorpayTestMode } from "@/lib/billing/razorpay";
 
 export const metadata: Metadata = { title: "Pricing · Baaki" };
 
@@ -17,6 +18,12 @@ export default async function PricingPage() {
       <p className="mt-3 max-w-2xl text-plaster/80">
         A tutor with 25 students at ₹2,000 has ₹50,000 a month riding on a notebook. If Baaki gets just one late family to pay on time, Pro has paid for itself ten times over. Pay by UPI AutoPay. Cancel any time.
       </p>
+      {!razorpayEnabled() && (
+        <p className="mt-6 border border-lamp px-3 py-2 font-mono text-xs text-lamp">Payments in test mode: Razorpay keys aren&apos;t set on this server, so checkout is off. Nothing will be charged.</p>
+      )}
+      {razorpayEnabled() && razorpayTestMode() && (
+        <p className="mt-6 border border-lamp px-3 py-2 font-mono text-xs text-lamp">Payments in test mode: Razorpay test checkout, no real money moves.</p>
+      )}
       <div className="mt-8">
         <PlanPicker signedIn={!!user} dark />
       </div>
