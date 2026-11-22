@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Fraunces, IBM_Plex_Mono } from "next/font/google";
 import BottomNav from "@/components/nav/BottomNav";
-import { TutorOnly } from "@/components/nav/TutorOnly";
+import { Main, TutorOnly } from "@/components/nav/TutorOnly";
 import { getSettings } from "@/lib/data";
 import { formatDate, todayIST } from "@/lib/dates";
 import "./globals.css";
@@ -25,11 +25,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const today = formatDate(todayIST());
   return (
     <html lang="en" className={`${fraunces.variable} ${plexMono.variable}`}>
-      <body className="flex min-h-dvh flex-col pb-24">
+      <body className="flex min-h-dvh flex-col">
         <TutorOnly>
         <header className="border-b border-plaster/15 px-4 py-3">
           <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3">
-            <Link href="/" className="flex items-baseline gap-3">
+            <Link href="/home" className="flex items-baseline gap-3">
               <span className="font-display text-2xl italic text-lamp">Baaki</span>
               <span className="hidden font-display text-lg sm:inline">{settings.centreName}</span>
             </Link>
@@ -42,11 +42,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         </header>
         </TutorOnly>
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
+        <Main>{children}</Main>
         <TutorOnly>
         <footer className="px-4 pb-4 text-center font-mono text-[11px] text-slate-mute">
           {settings.centreName}, {settings.city} · Demo data (synthetic) · Built with Codebenders
         </footer>
+        <div className="h-24" aria-hidden="true" />
         <BottomNav />
         </TutorOnly>
       </body>
