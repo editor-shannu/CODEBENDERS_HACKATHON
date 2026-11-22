@@ -22,7 +22,8 @@ export default async function PayPage({ params }: { params: Promise<{ token: str
     <Guard>
       {async () => {
         const inv = await db.invoice.findUnique({ where: { payToken: token }, include: { family: { select: { parentName: true, students: { where: { active: true }, select: { name: true } } } }, payments: true, claims: { where: { status: "PENDING" } } } });
-        if (!inv) notFound();
+        // pay links only work once the invoice is issued
+        if (!inv || inv.status === "DRAFT") notFound();
         const settings = await getSettings();
         const bal = balanceOf(inv);
         const kids = inv.family.students.filter(() => true).map((s) => s.name.split(" ")[0]).join(", ");

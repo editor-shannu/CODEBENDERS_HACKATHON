@@ -1,14 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
-import { addDays, dateInMonth, fromKey, monthKey, todayIST, toKey } from "@/lib/dates";
-import { familyMonthlyFee } from "@/lib/family-stats";
+import { addDays, fromKey, monthKey, todayIST, toKey } from "@/lib/dates";
 import { sumPaid } from "@/lib/invoice-status";
 import { seedDemo } from "@/lib/seed-data";
 import { settlePlanForBill, settlePlanForPayment } from "@/lib/munshi/plan";
-import { recalcInvoice } from "@/lib/invoices";
+import { createInvoiceFor, recalcInvoice } from "@/lib/invoices";
 import { learnFromHistory, learnFromReply } from "@/lib/munshi/memory";
 import { billSchema, claimSchema, paymentSchema, promiseSchema, settingsSchema, studentSchema } from "@/lib/validators";
 
@@ -22,6 +20,7 @@ export async function recordPayment(input: { invoiceId: string; amount: number; 
   const { invoiceId, amount, mode, reference, date } = parsed.data;
   const inv = await db.invoice.findUnique({ where: { id: invoiceId }, include: { payments: true } });
   if (!inv) return { ok: false, error: "Invoice not found" };
+  if (inv.status === "DRAFT") return { ok: false, error: "Issue this invoice before recording a payment" };
   const balance = inv.amount - sumPaid(inv.payments);
   if (amount > balance) return { ok: false, error: `Only ${balance} is due on this invoice` };
   await db.payment.create({ data: { invoiceId, amount, mode, reference: reference || null, date: fromKey(date) } });
@@ -37,7 +36,7 @@ export async function recordFamilyPayment(input: { familyId: string; amount: num
   const amount = Math.round(Number(input.amount));
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, error: "Enter the amount received" };
   if (input.mode !== "CASH" && input.mode !== "UPI") return { ok: false, error: "Pick cash or UPI" };
-  const invoices = await db.invoice.findMany({ where: { familyId: input.familyId }, include: { payments: true }, orderBy: { dueDate: "asc" } });
+  const invoices = await db.invoice.findMany({ where: { familyId: input.familyId, status: { not: "DRAFT" } }, include: { payments: true }, orderBy: { dueDate: "asc" } });
   const open = invoices.map((i) => ({ inv: i, bal: i.amount - sumPaid(i.payments) })).filter((x) => x.bal > 0);
   const due = open.reduce((s, x) => s + x.bal, 0);
   if (!open.length) return { ok: false, error: "Nothing is due from this family" };
@@ -75,36 +74,19 @@ export async function logReminder(familyId: string, tone: string, language: stri
 }
 
 export async function generateMonthInvoices(): Promise<ActionResult> {
-  const today = todayIST();
-  const month = monthKey(today);
-  const families = await db.family.findMany({ include: { students: true, invoices: { where: { month } } } });
-  const count = await db.invoice.count({ where: { month } });
-  let n = count;
+  const month = monthKey(todayIST());
+  const families = await db.family.findMany({ select: { id: true } });
   let created = 0;
-  for (const f of families) {
-    const active = f.students.filter((s) => s.active);
-    if (!active.length || f.invoices.length) continue;
-    const sorted = [...active].sort((a, b) => b.monthlyFee - a.monthlyFee);
-    const amount = familyMonthlyFee(active);
-    const gross = active.reduce((s, x) => s + x.monthlyFee, 0);
-    n++;
-    await db.invoice.create({
-      data: {
-        number: `LTP-${month}-${String(n).padStart(3, "0")}`,
-        familyId: f.id,
-        month,
-        amount,
-        discount: gross - amount,
-        dueDate: dateInMonth(month, sorted[0].dueDay),
-        status: "SENT",
-        payToken: randomBytes(12).toString("base64url"),
-        lines: JSON.stringify(sorted.map((s, i) => ({ name: s.name, batch: s.batch, fee: s.monthlyFee, discount: i === 0 ? 0 : Math.round(s.monthlyFee * 0.1) }))),
-      },
-    });
-    created++;
-  }
+  for (const f of families) if (await createInvoiceFor(f.id, month, "DRAFT")) created++;
   refreshAll();
-  return { ok: true, message: created ? `Created ${created} invoices for this month` : "This month's invoices already exist" };
+  return { ok: true, message: created ? `Created ${created} draft invoices. Check them, then Issue all.` : "This month's invoices already exist" };
+}
+
+/** Issues drafts: they start counting as owed and their pay links work. */
+export async function issueDrafts(input: { ids?: string[] } = {}): Promise<ActionResult> {
+  const r = await db.invoice.updateMany({ where: { status: "DRAFT", ...(input.ids?.length ? { id: { in: input.ids } } : {}) }, data: { status: "SENT" } });
+  refreshAll();
+  return { ok: true, message: r.count ? `Issued ${r.count} invoice${r.count > 1 ? "s" : ""}` : "No drafts to issue" };
 }
 
 export async function saveStudent(input: Record<string, unknown> & { id?: string }): Promise<ActionResult> {
@@ -189,7 +171,7 @@ export async function submitClaim(input: { token: string; amount: number; refere
   const parsed = claimSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the details" };
   const inv = await db.invoice.findUnique({ where: { payToken: parsed.data.token } });
-  if (!inv) return { ok: false, error: "This payment link is not valid" };
+  if (!inv || inv.status === "DRAFT") return { ok: false, error: "This payment link is not valid" };
   await db.paymentClaim.create({ data: { invoiceId: inv.id, amount: parsed.data.amount, reference: parsed.data.reference } });
   refreshAll();
   return { ok: true, message: "Thank you! The teacher will confirm shortly." };

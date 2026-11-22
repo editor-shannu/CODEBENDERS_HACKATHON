@@ -31,7 +31,7 @@ export async function loadFamilies(): Promise<FamilyLite[]> {
   return db.family.findMany({
     include: {
       students: { orderBy: { name: "asc" } },
-      invoices: { include: { payments: { orderBy: { date: "asc" } } }, orderBy: { dueDate: "asc" } },
+      invoices: { where: { status: { not: "DRAFT" } }, include: { payments: { orderBy: { date: "asc" } } }, orderBy: { dueDate: "asc" } },
       promises: { orderBy: { promisedDate: "asc" } },
       reminders: { where: { status: "SENT" }, orderBy: { sentAt: "desc" } },
     },
