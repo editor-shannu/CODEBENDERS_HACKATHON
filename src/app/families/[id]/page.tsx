@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, Eyebrow, PageHeader } from "@/components/ui/Card";
 import { LinkButton } from "@/components/ui/Button";
+import { HouseStatus, houseStatusOf } from "@/components/ui/HouseStatus";
 import { MoneyText } from "@/components/ui/MoneyText";
 import { Stamp } from "@/components/ui/Stamp";
 import { Guard } from "@/components/setup/Guard";
@@ -33,7 +34,8 @@ export default async function FamilyPage({ params }: { params: Promise<{ id: str
         return (
           <div>
             <PageHeader title={f.parentName} kicker={`Family · ${LANG[f.language] ?? f.language} messages`}>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <HouseStatus status={houseStatusOf(f.stats.balance, !!f.stats.openPromise)} size={44} />
                 <FamilyEditButton f={f} />
                 <LinkButton href={`/students/new?family=${f.id}`} variant="ghost">Add sibling</LinkButton>
               </div>
@@ -96,9 +98,12 @@ export default async function FamilyPage({ params }: { params: Promise<{ id: str
                   const overdue = isOverdue(inv, today);
                   return (
                     <div key={inv.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                      <div>
+                      <div className="flex items-center gap-3">
+                        <HouseStatus status={bal === 0 ? "paid" : houseStatusOf(bal, !!f.stats.openPromise)} size={28} />
+                        <div>
                         <Link href={`/invoices/${inv.id}`} className="font-display text-lg hover:text-brick">{formatMonth(inv.month)}</Link>
                         <p className="font-mono text-[11px] text-dusk-deep/60">{inv.number} · {bal ? relativeDue(inv.dueDate, today) : `paid ${formatINR(inv.amount)}`}</p>
+                        </div>
                       </div>
                       <div className="flex items-center gap-3">
                         {bal === 0 ? <Stamp kind="PAID" /> : overdue ? <Stamp kind="OVERDUE" /> : bal < inv.amount ? <Stamp kind="PARTIAL" /> : null}

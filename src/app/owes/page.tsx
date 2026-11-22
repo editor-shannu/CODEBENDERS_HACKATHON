@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, EmptyState, Eyebrow, PageHeader } from "@/components/ui/Card";
+import { HouseStatus, houseStatusOf } from "@/components/ui/HouseStatus";
 import { MoneyText } from "@/components/ui/MoneyText";
 import { RemindButton } from "@/components/actions/RemindButton";
 import { ChaseQueue, type QueueCard } from "@/components/owes/ChaseQueue";
@@ -32,6 +33,7 @@ export default async function OwesPage() {
       chaseScore: f.stats.chaseScore,
       bestTime: memoryOf(f).bestTime,
       payload: payloads[f.id],
+      status: houseStatusOf(f.stats.balance, !!f.stats.openPromise),
     }));
 
   return (
@@ -59,11 +61,14 @@ export default async function OwesPage() {
                 <li key={f.id}>
                   <Card className="py-3">
                     <div className="flex items-start justify-between gap-3">
-                      <Link href={`/families/${f.id}`} className="min-w-0">
+                      <Link href={`/families/${f.id}`} className="flex min-w-0 items-center gap-3">
+                        <HouseStatus status={houseStatusOf(f.stats.balance, !!f.stats.openPromise)} size={32} />
+                        <span className="min-w-0">
                         <p className="truncate font-semibold">{f.parentName}</p>
                         <p className="truncate text-sm text-dusk-deep/60">
                           {kidsLabel(f.students.map((s) => s.name))} · {[...new Set(f.stats.unpaid.map((i) => formatMonthShort(i.month)))].join(", ")}
                         </p>
+                        </span>
                       </Link>
                       <div className="text-right">
                         <MoneyText amount={f.stats.balance} className="text-xl font-semibold" />

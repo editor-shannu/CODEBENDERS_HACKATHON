@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, EmptyState, Eyebrow, PageHeader } from "@/components/ui/Card";
+import { HouseStatus, houseStatusOf } from "@/components/ui/HouseStatus";
 import { MoneyText } from "@/components/ui/MoneyText";
 import { Stamp } from "@/components/ui/Stamp";
 import { Guard } from "@/components/setup/Guard";
@@ -29,6 +30,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
           db.invoice.findMany({ include: { family: true, payments: true }, orderBy: [{ month: "desc" }, { number: "asc" }] }),
           db.paymentClaim.findMany({ where: { status: "PENDING" }, include: { invoice: { include: { family: true } } }, orderBy: { createdAt: "asc" } }),
         ]);
+        const openPromise = new Set((await db.payPromise.findMany({ where: { kept: null }, select: { familyId: true } })).map((p) => p.familyId));
         const months = [...new Set(invoices.map((i) => i.month))];
         const list = invoices
           .filter((i) => !month || i.month === month)
@@ -84,9 +86,12 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                   const bal = balanceOf(inv);
                   return (
                     <Link key={inv.id} href={`/invoices/${inv.id}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-dusk-deep/5">
-                      <div className="min-w-0">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <HouseStatus status={houseStatusOf(bal, openPromise.has(inv.familyId))} size={28} />
+                        <div className="min-w-0">
                         <p className="truncate font-display text-lg">{inv.family.parentName}</p>
                         <p className="font-mono text-[11px] text-dusk-deep/60">{inv.number} · {formatMonth(inv.month)} · {bal ? relativeDue(inv.dueDate, today) : "paid"}</p>
+                        </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-3">
                         {bal === 0 ? <Stamp kind="PAID" /> : isOverdue(inv, today) ? <Stamp kind="OVERDUE" /> : bal < inv.amount ? <Stamp kind="PARTIAL" /> : null}

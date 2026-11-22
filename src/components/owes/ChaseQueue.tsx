@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { RemindSheet } from "@/components/actions/RemindButton";
 import { Button } from "@/components/ui/Button";
+import { HouseStatus, type HouseState } from "@/components/ui/HouseStatus";
 import type { ReminderPayload } from "@/lib/data";
 
 export type QueueCard = {
@@ -17,6 +18,7 @@ export type QueueCard = {
   chaseScore: number;
   bestTime?: string;
   payload: ReminderPayload;
+  status: HouseState;
 };
 
 export function ChaseQueue({ cards }: { cards: QueueCard[] }) {
@@ -63,7 +65,7 @@ export function ChaseQueue({ cards }: { cards: QueueCard[] }) {
           {dx > 40 && <span className="absolute right-4 top-4 -rotate-6 border-2 border-lamp px-2 font-mono text-xs font-bold tracking-widest text-lamp">REMIND</span>}
           {dx < -40 && <span className="absolute left-14 top-4 rotate-6 border-2 border-dusk-deep/50 px-2 font-mono text-xs font-bold tracking-widest text-dusk-deep/60">SNOOZE</span>}
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-dusk-deep/60">Chase score {top.chaseScore} · {queue.length} in queue</p>
-          <Link href={`/families/${top.familyId}`} className="mt-1 block font-display text-3xl leading-tight">{top.parent}</Link>
+          <Link href={`/families/${top.familyId}`} className="mt-1 flex items-center gap-3 font-display text-3xl leading-tight"><HouseStatus status={top.status} size={36} />{top.parent}</Link>
           <p className="text-sm text-dusk-deep/70">for {top.kids}</p>
           <p className="big-number mt-3 text-5xl text-brick">{top.amount}</p>
           <p className="mt-2 font-mono text-xs">
