@@ -27,7 +27,7 @@ function canUse3D() {
 
 /**
  * The sticky stage behind the chapters. The flat poster paints first (server-rendered); the WebGL
- * lane loads after hydration and fades in over it. Reduced motion, no WebGL or low FPS keep the poster.
+ * lane loads after hydration and fades in over it. Reduced motion or no WebGL keep the poster; a slow GPU only lowers quality.
  */
 export function LaneStage({ data, chapter, control, on3D }: { data: LandingData; chapter: number; control: StageControl; on3D?: (on: boolean) => void }) {
   const [mode, setMode] = useState<"poster" | "loading" | "3d">("poster");
@@ -45,7 +45,7 @@ export function LaneStage({ data, chapter, control, on3D }: { data: LandingData;
       <LanePoster data={data} chapter={chapter} className={`absolute inset-0 transition-opacity duration-700 ${mode === "3d" ? "opacity-0" : "opacity-100"}`} />
       {mode !== "poster" && (
         <div className={`absolute inset-0 transition-opacity duration-700 ${mode === "3d" ? "opacity-100" : "opacity-0"}`}>
-          <Scene data={data} control={control} onReady={() => setMode("3d")} onFallback={() => setMode("poster")} />
+          <Scene data={data} control={control} onReady={() => setMode("3d")} />
         </div>
       )}
     </div>

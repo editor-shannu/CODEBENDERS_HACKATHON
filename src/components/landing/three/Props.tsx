@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { archedWall, FACADE, minaretProfile } from "./oldcity";
 import type { StageControl } from "../LaneStage";
@@ -357,4 +357,81 @@ function mulberry(a: number) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+/**
+ * A Sankranti patang on a manja string, flown from the centre's terrace. It chases the cursor
+ * across the sky; with no cursor (touch) it drifts on its own.
+ */
+export function Kite() {
+  const g = useRef<THREE.Group>(null);
+  const tail = useRef<THREE.Group>(null);
+  const [manja] = useState(() => new THREE.Line(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 16 }, () => new THREE.Vector3())), new THREE.LineBasicMaterial({ color: "#2a2420", transparent: true, opacity: 0.7 })));
+  const lineRef = useRef<THREE.Line>(null);
+  const kiteGeo = useMemo(() => {
+    const s = new THREE.Shape();
+    s.moveTo(0, 0.75);
+    s.lineTo(0.55, 0);
+    s.lineTo(0, -0.75);
+    s.lineTo(-0.55, 0);
+    s.lineTo(0, 0.75);
+    return new THREE.ShapeGeometry(s);
+  }, []);
+  const half = useMemo(() => {
+    const s = new THREE.Shape();
+    s.moveTo(0, 0.75);
+    s.lineTo(0.55, 0);
+    s.lineTo(0, -0.75);
+    s.lineTo(0, 0.75);
+    return new THREE.ShapeGeometry(s);
+  }, []);
+  const tmpRef = useRef({ v: new THREE.Vector3(), dir: new THREE.Vector3(), anchor: new THREE.Vector3(0, 7.2, -4.6) });
+
+  useFrame(({ camera, pointer, clock }, dt) => {
+    if (!g.current) return;
+    const tmp = tmpRef.current;
+    const line = lineRef.current;
+    if (!line) return;
+    const t = clock.elapsedTime;
+    // aim point: where the cursor ray is 14 units out, lifted into the sky
+    tmp.dir.set(pointer.x + Math.sin(t * 0.4) * 0.08, pointer.y * 0.6 + 0.35 + Math.sin(t * 0.7) * 0.05, 0.5).unproject(camera).sub(camera.position).normalize();
+    tmp.v.copy(camera.position).addScaledVector(tmp.dir, 14);
+    tmp.v.y = Math.max(tmp.v.y, 6);
+    const k = 1 - Math.exp(-2.2 * Math.min(dt, 0.05));
+    const prev = g.current.position.clone();
+    g.current.position.lerp(tmp.v, k);
+    const vel = g.current.position.clone().sub(prev);
+    g.current.lookAt(camera.position);
+    g.current.rotateZ(THREE.MathUtils.clamp(-vel.x * 4, -0.6, 0.6) + Math.sin(t * 2.1) * 0.08);
+    if (tail.current) tail.current.rotation.z = Math.sin(t * 6) * 0.35;
+    // the manja sags from the terrace to the kite
+    const pos = line.geometry.attributes.position as THREE.BufferAttribute;
+    const a = tmp.anchor;
+    const b = g.current.position;
+    for (let i = 0; i < 16; i++) {
+      const u = i / 15;
+      pos.setXYZ(i, a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u - Math.sin(Math.PI * u) * 1.6, a.z + (b.z - a.z) * u);
+    }
+    pos.needsUpdate = true;
+  });
+
+  return (
+    <>
+      <primitive ref={lineRef} object={manja} />
+      <group ref={g} position={[0, 12, -2]}>
+        <mesh geometry={kiteGeo}>
+          <meshStandardMaterial color="#e9a51c" side={THREE.DoubleSide} roughness={0.8} emissive="#e9a51c" emissiveIntensity={0.15} />
+        </mesh>
+        <mesh geometry={half} position={[0, 0, 0.005]}>
+          <meshStandardMaterial color="#b3302b" side={THREE.DoubleSide} roughness={0.8} />
+        </mesh>
+        <group ref={tail} position={[0, -0.75, 0]}>
+          <mesh position={[0, -0.25, 0]}>
+            <planeGeometry args={[0.18, 0.5]} />
+            <meshStandardMaterial color="#1b2444" side={THREE.DoubleSide} />
+          </mesh>
+        </group>
+      </group>
+    </>
+  );
 }
