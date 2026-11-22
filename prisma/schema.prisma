@@ -220,3 +220,16 @@ model JoinRequest {
 
   @@index([userId])
 }
+
+// Something shared to Baaki from the phone's share menu (a WhatsApp chat export, a payment screenshot or SMS).
+model InboxItem {
+  id        String   @id @default(cuid())
+  userId    String   @default("") // owner (User.id); scoped by the tenant extension in src/lib/db.ts
+  kind      String // CHAT | PAYMENT_TEXT | PAYMENT_IMAGE
+  text      String   @default("")
+  image     String   @default("") // data URL, payment screenshots only
+  status    String   @default("NEW") // NEW | DONE
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}

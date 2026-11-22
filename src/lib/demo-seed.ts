@@ -77,6 +77,7 @@ export async function seedDemo(userId: string, now: Date = new Date()) {
   const cap = (d: Date) => (d >= today ? addDays(today, -1) : d);
 
   await db.$transaction([
+    db.inboxItem.deleteMany({ where: own }),
     db.joinRequest.deleteMany({ where: own }),
     db.agentAction.deleteMany({ where: own }),
     db.agentPlan.deleteMany({ where: own }),

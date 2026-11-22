@@ -81,10 +81,10 @@ export function parseReplyRules(text: string, today: Date, balance: number): Rea
 
 export const llmEnabled = () => Boolean(process.env.LLM_API_KEY);
 
-type Msg = { role: "system" | "user" | "assistant" | "tool"; content: string | null; tool_calls?: ToolCall[]; tool_call_id?: string };
+export type Msg = { role: "system" | "user" | "assistant" | "tool"; content: string | null; tool_calls?: ToolCall[]; tool_call_id?: string };
 type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
 
-async function chat(messages: Msg[], tools?: unknown[], json = false): Promise<{ content: string | null; tool_calls?: ToolCall[] }> {
+export async function chat(messages: Msg[], tools?: unknown[], json = false): Promise<{ content: string | null; tool_calls?: ToolCall[] }> {
   const base = process.env.LLM_BASE_URL || "https://api.groq.com/openai/v1";
   const res = await fetch(`${base.replace(/\/$/, "")}/chat/completions`, {
     method: "POST",

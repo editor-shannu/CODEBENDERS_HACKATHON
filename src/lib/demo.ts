@@ -8,7 +8,7 @@ export const DEMO_EMAIL_DOMAIN = "demo.baaki.local";
 export const isDemoEmail = (email: string | null | undefined) => !!email && email.endsWith(`@${DEMO_EMAIL_DOMAIN}`);
 
 const TENANT_TABLES = [
-  "joinRequest", "agentAction", "agentPlan", "paymentClaim", "payment", "invoice", "reminder", "payPromise", "student", "family", "bill", "keyDate", "settings",
+  "inboxItem", "joinRequest", "agentAction", "agentPlan", "paymentClaim", "payment", "invoice", "reminder", "payPromise", "student", "family", "bill", "keyDate", "settings",
 ] as const;
 
 /** Removes demo accounts older than 12 hours, with every row they own. */
