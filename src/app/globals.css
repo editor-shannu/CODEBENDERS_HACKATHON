@@ -1,26 +1,26 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #0E0E0E;
-  --color-ledger: #F3EAD7;
-  --color-khata: #B3262D;
-  --color-turmeric: #E2A529;
-  --color-mint: #3FB68B;
-  --color-ink-muted: #8A8478;
+  --color-dusk: #141c2b;
+  --color-dusk-deep: #0c1220;
+  --color-lamp: #f2b35a;
+  --color-brick: #b4432e;
+  --color-plaster: #f3ead8;
+  --color-slate-mute: #8a97a8;
   --font-display: var(--font-fraunces), Georgia, serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 }
 
 body {
-  background: var(--color-ink);
-  color: var(--color-ledger);
+  background: var(--color-dusk);
+  color: var(--color-plaster);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   margin: 0;
 }
 
 .ruled-paper {
   position: relative;
-  background-color: var(--color-ledger);
+  background-color: var(--color-plaster);
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0,
@@ -38,7 +38,7 @@ body {
   bottom: 0;
   left: 28px;
   width: 1px;
-  background: var(--color-khata);
+  background: var(--color-brick);
 }
 
 @keyframes stamp-slam {
@@ -74,10 +74,10 @@ body {
 /* ---------- Ledger Noir additions ---------- */
 html { -webkit-tap-highlight-color: transparent; }
 body { font-feature-settings: "ss01"; }
-::selection { background: var(--color-turmeric); color: var(--color-ink); }
+::selection { background: var(--color-lamp); color: var(--color-dusk-deep); }
 
 .stamp { mix-blend-mode: multiply; }
-.bg-ink .stamp, .text-ledger .stamp { mix-blend-mode: normal; }
+.bg-dusk .stamp, .text-plaster .stamp { mix-blend-mode: normal; }
 
 @keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: no-preference) {
@@ -85,7 +85,7 @@ body { font-feature-settings: "ss01"; }
   .tick-in { animation: sheet-in 0.25s ease-out; }
 }
 
-.late-bar { background: repeating-linear-gradient(90deg, var(--color-khata) 0 6px, transparent 6px 8px); }
+.late-bar { background: repeating-linear-gradient(90deg, var(--color-brick) 0 6px, transparent 6px 8px); }
 .hairline-b { border-bottom: 1px solid rgba(14, 14, 14, 0.12); }
 .big-number { font-family: var(--font-mono); font-weight: 600; letter-spacing: -0.04em; line-height: 0.9; }
 .swipe-card { touch-action: pan-y; }

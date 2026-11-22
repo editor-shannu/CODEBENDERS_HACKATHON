@@ -13,9 +13,9 @@ export function RecordPaymentButton({
   title,
   today,
   label = "Mark paid",
-  variant = "mint",
+  variant = "lamp",
   className = "",
-}: { invoiceId: string; balance: number; title: string; today: string; label?: string; variant?: "mint" | "ghost" | "ink" | "primary"; className?: string }) {
+}: { invoiceId: string; balance: number; title: string; today: string; label?: string; variant?: "lamp" | "ghost" | "plaster" | "primary"; className?: string }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(String(balance));
   const [mode, setMode] = useState<"CASH" | "UPI">("UPI");
@@ -55,15 +55,15 @@ export function RecordPaymentButton({
               <label className={labelClass} htmlFor="amt">Amount received (₹)</label>
               <input id="amt" inputMode="numeric" className={inputClass} value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} />
               <div className="mt-2 flex gap-2">
-                <button className="min-h-9 border border-ink/25 px-3 font-mono text-xs" onClick={() => setAmount(String(balance))}>Full</button>
-                <button className="min-h-9 border border-ink/25 px-3 font-mono text-xs" onClick={() => setAmount(String(Math.round(balance / 2)))}>Half</button>
+                <button className="min-h-9 border border-dusk-deep/25 px-3 font-mono text-xs" onClick={() => setAmount(String(balance))}>Full</button>
+                <button className="min-h-9 border border-dusk-deep/25 px-3 font-mono text-xs" onClick={() => setAmount(String(Math.round(balance / 2)))}>Half</button>
               </div>
             </div>
             <div>
               <p className={labelClass}>Mode</p>
-              <div className="grid grid-cols-2 border border-ink/25">
+              <div className="grid grid-cols-2 border border-dusk-deep/25">
                 {(["UPI", "CASH"] as const).map((m) => (
-                  <button key={m} onClick={() => setMode(m)} className={`min-h-11 font-mono text-xs font-semibold tracking-widest ${mode === m ? "bg-ink text-ledger" : ""}`}>{m}</button>
+                  <button key={m} onClick={() => setMode(m)} className={`min-h-11 font-mono text-xs font-semibold tracking-widest ${mode === m ? "bg-dusk-deep text-plaster" : ""}`}>{m}</button>
                 ))}
               </div>
             </div>
@@ -77,8 +77,8 @@ export function RecordPaymentButton({
               <label className={labelClass} htmlFor="date">Received on</label>
               <input id="date" type="date" max={today} className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
-            {error && <p className="font-mono text-sm text-khata">{error}</p>}
-            <Button variant="mint" className="w-full" onClick={submit} disabled={pending}>{pending ? "Saving…" : "Record payment"}</Button>
+            {error && <p className="font-mono text-sm text-brick">{error}</p>}
+            <Button variant="lamp" className="w-full" onClick={submit} disabled={pending}>{pending ? "Saving…" : "Record payment"}</Button>
           </div>
         )}
       </Sheet>

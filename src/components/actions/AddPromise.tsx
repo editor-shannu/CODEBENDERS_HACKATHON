@@ -29,7 +29,7 @@ export function AddPromiseButton({ familyId, amount, today, parent }: { familyId
             <label className={labelClass} htmlFor="pn">What they said</label>
             <input id="pn" className={inputClass} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. after salary on Friday" />
           </div>
-          {error && <p className="font-mono text-sm text-khata">{error}</p>}
+          {error && <p className="font-mono text-sm text-brick">{error}</p>}
           <Button
             className="w-full"
             disabled={pending}

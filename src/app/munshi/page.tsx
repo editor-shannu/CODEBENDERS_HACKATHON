@@ -32,13 +32,13 @@ export default function MunshiPage() {
             <section>
               <Eyebrow className="mb-2">Today&apos;s brief</Eyebrow>
               {brief.length ? (
-                <Card className="divide-y divide-ink/10 p-0">
+                <Card className="divide-y divide-dusk-deep/10 p-0">
                   {brief.slice(0, 6).map((item) => (
                     <div key={item.key} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                       <div className="min-w-0 flex-1">
                         <p className="font-display text-lg leading-snug">{item.title}</p>
-                        <p className="text-sm text-ink/70">{item.detail}</p>
-                        <p className="font-mono text-[11px] text-ink/50">Why: {item.reason}</p>
+                        <p className="text-sm text-dusk-deep/70">{item.detail}</p>
+                        <p className="font-mono text-[11px] text-dusk-deep/50">Why: {item.reason}</p>
                       </div>
                       <BriefActions item={item} payload={item.familyId ? payloads[item.familyId] : undefined} />
                     </div>
@@ -52,11 +52,11 @@ export default function MunshiPage() {
             {plan && forecast.rent && (
               <section id="plan">
                 <Eyebrow className="mb-2">Rent Defense Plan</Eyebrow>
-                <Card variant={forecast.rent.risk >= 0.4 ? "khata" : "ink"} ruled={false}>
+                <Card variant={forecast.rent.risk >= 0.4 ? "brick" : "dusk"} ruled={false}>
                   <p className="font-display text-2xl">{plan.title}</p>
                   <p className="text-sm opacity-80">{plan.goal} Rent risk today: {Math.round(forecast.rent.risk * 100)}%.</p>
                 </Card>
-                <Card className="divide-y divide-ink/10 p-0">
+                <Card className="divide-y divide-dusk-deep/10 p-0">
                   {plan.steps.map((s, i) => {
                     const f = s.familyId ? board.families.find((x) => x.id === s.familyId) : undefined;
                     const discount = s.type === "DISCOUNT" && f
@@ -65,10 +65,10 @@ export default function MunshiPage() {
                     return (
                       <div key={i} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                         <div className="min-w-0 flex-1">
-                          <p className="font-mono text-[11px] text-ink/50">Step {i + 1}</p>
+                          <p className="font-mono text-[11px] text-dusk-deep/50">Step {i + 1}</p>
                           <p className="font-display text-lg leading-snug">{s.title}</p>
-                          <p className="text-sm text-ink/70">{s.detail}</p>
-                          <p className="font-mono text-[11px] text-ink/50">Why: {s.reason}</p>
+                          <p className="text-sm text-dusk-deep/70">{s.detail}</p>
+                          <p className="font-mono text-[11px] text-dusk-deep/50">Why: {s.reason}</p>
                         </div>
                         <PlanStepAction step={s} payload={s.familyId ? payloads[s.familyId] : undefined} discount={discount} />
                       </div>
@@ -92,12 +92,12 @@ export default function MunshiPage() {
             {inbox.length > 0 && (
               <section>
                 <Eyebrow className="mb-2">Approval inbox · {inbox.length}</Eyebrow>
-                <Card className="divide-y divide-ink/10 p-0">
+                <Card className="divide-y divide-dusk-deep/10 p-0">
                   {inbox.map((a) => (
                     <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                       <div className="min-w-0 flex-1">
                         <p className="font-display text-lg">{a.title}</p>
-                        {a.reason && <p className="font-mono text-[11px] text-ink/50">Why: {a.reason}</p>}
+                        {a.reason && <p className="font-mono text-[11px] text-dusk-deep/50">Why: {a.reason}</p>}
                       </div>
                       <InboxButtons id={a.id} />
                     </div>
@@ -109,11 +109,11 @@ export default function MunshiPage() {
             <section>
               <Eyebrow className="mb-2">Activity log</Eyebrow>
               {log.length ? (
-                <Card className="divide-y divide-ink/10 p-0">
+                <Card className="divide-y divide-dusk-deep/10 p-0">
                   {log.map((a) => (
                     <div key={a.id} className="px-4 py-2">
                       <p className="text-sm">{a.title}{a.familyId && famName.get(a.familyId) && !a.title.includes(famName.get(a.familyId)!) ? ` · ${famName.get(a.familyId)}` : ""}</p>
-                      <p className="font-mono text-[11px] text-ink/50">{formatDate(a.createdAt)} · {a.status.toLowerCase()} · {a.source === "AI" ? "AI" : "rules"}{a.reason ? ` · ${a.reason}` : ""}</p>
+                      <p className="font-mono text-[11px] text-dusk-deep/50">{formatDate(a.createdAt)} · {a.status.toLowerCase()} · {a.source === "AI" ? "AI" : "rules"}{a.reason ? ` · ${a.reason}` : ""}</p>
                     </div>
                   ))}
                 </Card>

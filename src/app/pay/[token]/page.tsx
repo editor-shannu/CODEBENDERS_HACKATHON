@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { Eyebrow } from "@/components/ui/Card";
 import { Stamp } from "@/components/ui/Stamp";
+import { HouseStatus } from "@/components/ui/HouseStatus";
 import { Guard } from "@/components/setup/Guard";
 import { PayClaim } from "@/components/invoices/PayClaim";
 import { db } from "@/lib/db";
@@ -29,36 +30,44 @@ export default async function PayPage({ params }: { params: Promise<{ token: str
         const qr = bal > 0 ? await QRCode.toDataURL(upi, { margin: 1, width: 260, color: { dark: "#0E0E0E", light: "#F3EAD7" } }) : null;
         return (
           <div className="mx-auto max-w-md">
-            <p className="mb-4 text-center font-display text-2xl italic text-turmeric">{settings.centreName}</p>
-            <div className="ruled-paper relative border border-ink/15 p-6 text-ink">
+            <p className="mb-4 text-center font-display text-2xl italic text-lamp">{settings.centreName}</p>
+            <div className="ruled-paper relative border border-dusk-deep/15 p-6 text-dusk-deep">
               <Eyebrow>Tuition fee · {formatMonth(inv.month, false)}</Eyebrow>
               <h1 className="mt-1 font-display text-3xl leading-tight">Namaste {inv.family.parentName.split(" ")[0]} garu</h1>
-              <p className="text-sm text-ink/70">for {kids}</p>
+              <p className="text-sm text-dusk-deep/70">for {kids}</p>
               {bal === 0 ? (
                 <div className="my-8 text-center">
+                  <div className="mb-4 flex justify-center">
+                    <HouseStatus status="paid" size={56} />
+                  </div>
                   <Stamp kind="PAID" className="text-3xl" />
                   <p className="mt-4 font-mono text-sm">Fully paid. Thank you!</p>
                 </div>
               ) : (
                 <>
-                  <p className="big-number mt-4 text-5xl text-khata">{formatINR(bal)}</p>
-                  <p className="font-mono text-xs text-ink/60">Due {formatDate(inv.dueDate)} · {inv.number}</p>
+                  <p className="big-number mt-4 text-5xl text-brick">{formatINR(bal)}</p>
+                  <p className="font-mono text-xs text-dusk-deep/60">Due {formatDate(inv.dueDate)} · {inv.number}</p>
                   {qr && (
                     <div className="my-5 flex flex-col items-center">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={qr} alt="UPI QR code" width={200} height={200} className="border border-ink/20" />
+                      <img src={qr} alt="UPI QR code" width={200} height={200} className="border border-dusk-deep/20" />
                       <p className="mt-2 font-mono text-xs">{settings.upiName} · {settings.upiId}</p>
                     </div>
                   )}
                   {inv.claims.length > 0 ? (
-                    <p className="border border-turmeric p-3 text-center font-mono text-sm">We got your payment note. {settings.tutorName.split(" ")[0]} garu will confirm soon.</p>
+                    <div className="space-y-3">
+                      <div className="flex justify-center">
+                        <HouseStatus status="promised" size={56} />
+                      </div>
+                      <p className="border border-lamp p-3 text-center font-mono text-sm">We got your payment note. {settings.tutorName.split(" ")[0]} garu will confirm soon.</p>
+                    </div>
                   ) : (
                     <PayClaim token={token} balance={bal} upi={upi} />
                   )}
                 </>
               )}
             </div>
-            <p className="mt-4 text-center font-mono text-[11px] text-ledger/50">Payments go directly to {settings.tutorName}&apos;s UPI. Baaki never handles your money.</p>
+            <p className="mt-4 text-center font-mono text-[11px] text-plaster/50">Payments go directly to {settings.tutorName}&apos;s UPI. Baaki never handles your money.</p>
           </div>
         );
       }}
