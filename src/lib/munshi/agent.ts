@@ -441,6 +441,12 @@ async function rulesAnswer(q: string, ctx: Ctx): Promise<AskResult> {
     answer = `Namaskaram${first ? ` ${first} garu` : ""}! ${owingNow.length ? `${formatINR(ctx.totalPending)} is pending from ${owingNow.length} families today.` : "Nothing is pending today."}${nextStep}`;
   } else if (/^(bye+|good ?night|see you|later|ok bye|tata)\b/.test(smallTalk)) {
     answer = `Bye${first ? ` ${first} garu` : ""}! I'll keep watching the fees.${owingNow.length ? ` ${formatINR(ctx.totalPending)} is still pending; I'll remind you tomorrow.` : ""}`;
+  } else if (/^(no+|nope|nah|not now|later|skip|leave it)\b/.test(smallTalk) && smallTalk.split(/\s+/).length <= 3) {
+    answer = "No problem. I'll leave it for now. Just tell me when you want something done.";
+  } else if (/^(yes+|yeah|yep|ok do it|sure|go ahead|haan|avunu|please)\b/.test(smallTalk) && smallTalk.split(/\s+/).length <= 4 && owingNow.length) {
+    const target = [...(ctx.history ?? [])].reverse().map((h) => ctx.families.find((f) => h.text.includes(f.parentName))).find(Boolean) ?? owingNow[0];
+    const r = (await call("draft_reminder", { name: target.parentName })) as { draft?: string; note?: string; status?: string };
+    answer = r.draft ? `Here's a reminder for ${target.parentName}. I haven't sent it; tap the button to send on WhatsApp.\n\n${r.draft}` : r.note ?? "I couldn't draft that.";
   } else if (/^(thanks?|thank you|thx|ty|dhanyavaad|ok+|okay|cool|nice|great)\b/.test(smallTalk) && smallTalk.split(/\s+/).length <= 4) {
     answer = `Anytime.${nextStep}`;
   } else if (/\b(fuck|shit|damn|idiot|stupid|useless|bc|mc)\b/.test(smallTalk)) {
