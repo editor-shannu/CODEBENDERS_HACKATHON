@@ -33,7 +33,7 @@ export function FamilyEditButton({ f }: { f: { id: string; parentName: string; l
             <label className={labelClass} htmlFor="nt">Notes</label>
             <textarea id="nt" rows={3} className={`${inputClass} py-2`} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
-          {error && <p className="font-mono text-sm text-khata">{error}</p>}
+          {error && <p className="font-mono text-sm text-brick">{error}</p>}
           <Button
             className="w-full"
             disabled={pending}

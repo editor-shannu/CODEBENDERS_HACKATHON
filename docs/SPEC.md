@@ -18,24 +18,34 @@ owes money, predicts cash flow, and later gets an AI agent called Munshi.
 Tutor name, centre name, UPI ID, UPI display name.
 
 ## Pages
-- `/` Home: bento grid of live tiles
 - `/owes` Who-owes board
 - `/students` Student list
 - `/students/new` Add student
 - `/students/[id]/edit` Edit or deactivate student
 - `/families/[id]` Family view
 - `/invoices` Invoice list and filters
+- `/` Landing: one month in one scroll, ends with "I run the centre" (→ `/home`) or "I'm a parent" (→ `/parent`)
+- `/home` Dashboard
+- `/parent` Parent picker: pick a family or paste a pay link
 - `/settings` Tutor name, centre name, UPI ID, UPI display name
 
 ## Navigation
-Bottom tab bar with lucide-react icons and text labels: Home, Owes, Students,
+Bottom tab bar (hidden on `/`, `/parent` and `/pay/*`) with lucide-react icons and text labels: Home (`/home`), Owes, Students,
 Invoices, Settings. Icons are used only in the tab bar.
 
 ## Visual rules
-- Colours: ink #0E0E0E, ledger #F3EAD7, khata red #B3262D, turmeric #E2A529, mint #3FB68B
+- Colours: dusk #141c2b (background), dusk-deep #0c1220, lamp #f2b35a (paid, positive,
+  primary action), brick #b4432e (overdue, broken promise, PAID stamp ink), plaster #f3ead8
+  (cards, main text on dark), slate-mute #8a97a8 (secondary text)
 - Headings in Fraunces, numbers and rupee amounts in IBM Plex Mono
 - Ruled-paper lines are the only allowed gradient-like pattern
-- No emoji, illustrations, gradients (other than ruled lines), glassmorphism, blur, or shadows
+- Fee status is shown with the HouseStatus icon: lit window = paid, half-lit = promised,
+  dark window with a brick door = owes
+- App pages: flat, no 3D, no scroll animations, tap targets at least 44px, one main action
+  per screen. No emoji, gradients (other than ruled lines), glassmorphism, blur, or shadows.
+- The landing page (`/`) is the one exception: its 3D layer may use light, shadow, depth of
+  field, bloom, grain and vignette. Its text stays flat HTML over the canvas, and it falls
+  back to a flat poster for reduced motion, no WebGL, or low frame rates.
 
 ## Dates
 - Every date is derived from the current IST date. Nothing is hard-coded.

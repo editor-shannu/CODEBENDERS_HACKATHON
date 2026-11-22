@@ -27,14 +27,14 @@ export function SetupNotice({ health }: { health: Exclude<DbHealth, { ok: true }
   const c = COPY[health.reason];
   return (
     <Card className="mx-auto max-w-xl">
-      <Eyebrow className="text-khata opacity-100">Setup needed</Eyebrow>
+      <Eyebrow className="text-brick opacity-100">Setup needed</Eyebrow>
       <h1 className="mt-1 font-display text-3xl leading-tight">{c.title}</h1>
       <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm">
         {c.steps.map((s) => (
           <li key={s}>{s}</li>
         ))}
       </ol>
-      {health.detail && <p className="mt-4 font-mono text-xs text-ink/60">Error code: {health.detail}</p>}
+      {health.detail && <p className="mt-4 font-mono text-xs text-dusk-deep/60">Error code: {health.detail}</p>}
     </Card>
   );
 }

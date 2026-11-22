@@ -25,7 +25,7 @@ export default function SettingsPage() {
               <Eyebrow className="mb-3">Key dates (festivals, exams)</Eyebrow>
               <KeyDatesEditor dates={keyDates.map((k) => ({ id: k.id, name: k.name, start: toKey(k.startDate), end: toKey(k.endDate), label: `${formatDate(k.startDate, { weekday: false, year: false })} to ${formatDate(k.endDate, { weekday: false, year: false })}`, factor: k.collectionFactor }))} />
             </Card>
-            <Card variant="ink" ruled={false}>
+            <Card variant="dusk" ruled={false}>
               <Eyebrow className="mb-2">Demo</Eyebrow>
               <p className="mb-3 text-sm opacity-80">Restores Lakshmi Teaching Point&apos;s 18 families, with every date shifted to today.</p>
               <ResetDemoButton />

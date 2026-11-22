@@ -1,13 +1,13 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 
-type Variant = "primary" | "ghost" | "danger" | "mint" | "ink";
+type Variant = "primary" | "ghost" | "danger" | "lamp" | "plaster";
 const styles: Record<Variant, string> = {
   primary: "bg-lamp text-dusk-deep border-lamp hover:opacity-90",
   ghost: "bg-transparent border-current hover:bg-current/5",
   danger: "bg-transparent text-brick border-brick hover:bg-brick hover:text-plaster",
-  mint: "bg-lamp text-dusk-deep border-lamp hover:opacity-90",
-  ink: "bg-plaster text-dusk-deep border-plaster hover:opacity-90",
+  lamp: "bg-lamp text-dusk-deep border-lamp hover:opacity-90",
+  plaster: "bg-plaster text-dusk-deep border-plaster hover:opacity-90",
 };
 const base =
   "inline-flex min-h-11 min-w-11 items-center justify-center gap-2 border px-4 font-mono text-xs font-semibold uppercase tracking-[0.12em] transition disabled:opacity-50";

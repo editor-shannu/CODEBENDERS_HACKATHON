@@ -8,7 +8,7 @@ export function WeatherStrip({ weeks, compact = false }: { weeks: ForecastResult
     <div className="grid grid-cols-6 gap-1">
       {weeks.map((w) => {
         const Icon = w.weather === "STORM" ? CloudLightning : w.weather === "CLOUDY" ? Cloud : Sun;
-        const color = w.weather === "STORM" ? "text-khata" : w.weather === "CLOUDY" ? "text-turmeric" : "text-mint";
+        const color = w.weather === "STORM" ? "text-brick" : w.weather === "CLOUDY" ? "text-lamp" : "text-lamp";
         return (
           <div key={w.start} className="flex flex-col items-center gap-1 text-center" title={`${w.weather.toLowerCase()} week`}>
             <Icon className={`size-6 ${color}`} strokeWidth={1.75} aria-label={w.weather.toLowerCase()} />

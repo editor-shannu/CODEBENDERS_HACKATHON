@@ -3,19 +3,19 @@ import type { ReactNode } from "react";
 type Props = {
   children: ReactNode;
   className?: string;
-  variant?: "ledger" | "ink" | "khata" | "turmeric";
+  variant?: "plaster" | "dusk" | "brick" | "lamp";
   ruled?: boolean;
   as?: "div" | "section" | "article" | "li";
 };
 
 /** Baaki card: flat plaster paper, or dusk-deep with a hairline. */
-export function Card({ children, className = "", variant = "ledger", ruled = true, as: Tag = "div" }: Props) {
+export function Card({ children, className = "", variant = "plaster", ruled = true, as: Tag = "div" }: Props) {
   const base =
-    variant === "ledger"
-      ? `${ruled ? "bg-plaster" : "bg-plaster pl-5"} text-dusk-deep border border-dusk-deep/15`
-      : variant === "khata"
-        ? "bg-slate-mute text-dusk-deep border border-slate-mute"
-        : variant === "turmeric"
+    variant === "plaster"
+      ? `${ruled ? "ruled-paper" : "bg-plaster pl-5"} text-dusk-deep border border-dusk-deep/15`
+      : variant === "brick"
+        ? "bg-brick text-plaster border border-brick"
+        : variant === "lamp"
           ? "bg-lamp text-dusk-deep border border-lamp"
           : "bg-dusk-deep text-plaster border border-plaster/20";
   return <Tag className={`relative ${base} p-4 pr-4 ${className}`}>{children}</Tag>;
