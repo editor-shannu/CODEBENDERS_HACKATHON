@@ -6,6 +6,7 @@ import * as THREE from "three";
 import type { LandingData, LandingFamily } from "../landing-data";
 import type { StageControl } from "../LaneStage";
 import { useLaneTextures } from "./materials";
+import { lane, useLane } from "./Interact";
 import { archShape, FACADE, SHOPS, shutterTexture, signTexture } from "./oldcity";
 
 export const HOUSE_GAP = 3.4;
@@ -44,14 +45,25 @@ function House({ f, i, data, control, tex }: { f: LandingFamily; i: number; data
   const glow = useRef<THREE.PointLight>(null);
   const paidOrder = data.families.filter((x) => x.status === "paid").indexOf(f);
   const order = { paid: paidOrder, paidCount: data.families.filter((x) => x.status === "paid").length, defense: data.defense.indexOf(f.id) };
+  const { hover, acted } = useLane();
+  const hovered = hover?.f.id === f.id;
+  const act = acted[f.id];
+  const lift = useRef<THREE.Group>(null);
 
-  useFrame(({ clock }) => {
-    const lit = litAt(control.progress.current, f, order, clock.elapsedTime);
+  useFrame(({ clock }, dt) => {
+    const t = clock.elapsedTime;
+    let lit = litAt(control.progress.current, f, order, t);
+    if (act === "paid") lit = Math.max(lit, 1);
+    if (act === "chased") lit = Math.max(lit, 0.32 + 0.08 * Math.sin(t * 9) + 0.05 * Math.sin(t * 23));
     if (win.current) {
-      win.current.emissiveIntensity = lit * 3.2;
+      win.current.emissiveIntensity = lit * 3.2 + (hovered ? 0.6 : 0);
       win.current.color.setScalar(0.05 + lit * 0.4);
     }
-    if (glow.current) glow.current.intensity = lit * 2.2;
+    if (glow.current) glow.current.intensity = lit * 2.2 + (hovered ? 1.2 : 0);
+    if (lift.current) {
+      const target = hovered ? 0.12 : 0;
+      lift.current.position.y = THREE.MathUtils.damp(lift.current.position.y, target, 10, dt);
+    }
   });
 
   const parts = useMemo(() => {
@@ -69,8 +81,24 @@ function House({ f, i, data, control, tex }: { f: LandingFamily; i: number; data
     return { wall, sign, shutter, arch };
   }, [tex, paint, shop, i]);
 
+  const z = LANE_Z - (i % 3) * 0.4;
   return (
-    <group position={[houseX(i), 0, LANE_Z - (i % 3) * 0.4]}>
+    <group
+      position={[houseX(i), 0, z]}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        lane.hover(f, [houseX(i), h + 1.6, z + d / 2]);
+      }}
+      onPointerOut={(e) => {
+        e.stopPropagation();
+        if (lane.get().hover?.f.id === f.id) lane.hover(null);
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        lane.act(f);
+      }}
+    >
+      <group ref={lift}>
       <mesh position={[0, h / 2, 0]} castShadow receiveShadow material={parts.wall}>
         <boxGeometry args={[w, h, d]} />
       </mesh>
@@ -168,6 +196,7 @@ function House({ f, i, data, control, tex }: { f: LandingFamily; i: number; data
           <meshStandardMaterial color="#d8d6d0" roughness={0.6} />
         </mesh>
       )}
+      </group>
     </group>
   );
 }

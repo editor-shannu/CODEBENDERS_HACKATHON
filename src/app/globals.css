@@ -135,3 +135,14 @@ body { font-feature-settings: "ss01"; }
   header, footer, nav, .no-print { display: none !important; }
   main { padding: 0 !important; max-width: none !important; }
 }
+
+/* landing: the chapter chit slides in; the calendar page tears off and falls */
+@keyframes chit-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.chit-in { animation: chit-in 420ms cubic-bezier(.2,.7,.2,1) both; }
+@keyframes tear-off {
+  0% { transform: none; opacity: 1; }
+  35% { transform: rotate(-9deg) translate(-4px, 4px); transform-origin: 100% 0; }
+  100% { transform: rotate(-28deg) translate(-40px, 160px); opacity: 0; transform-origin: 100% 0; }
+}
+.tear-off { animation: tear-off 600ms cubic-bezier(.5,0,.75,0) forwards; clip-path: polygon(0 4%, 6% 0, 12% 3%, 18% 0, 25% 4%, 31% 0, 38% 3%, 44% 0, 50% 4%, 56% 0, 63% 3%, 69% 0, 75% 4%, 81% 0, 88% 3%, 94% 0, 100% 4%, 100% 100%, 0 100%); }
+@media (prefers-reduced-motion: reduce) { .chit-in, .tear-off { animation: none; } .tear-off { display: none; } }
