@@ -405,3 +405,12 @@ export async function voiceKhataAction(text: string) {
   const balance = fam.invoices.reduce((s, i) => s + Math.max(0, i.amount - sumPaid(i.payments)), 0);
   return { ok: true as const, note, familyId: fam.id, parent: fam.parentName, balance, today: toKey(todayIST()) };
 }
+
+/* ---------- Fee Pause ---------- */
+export async function setStudentPause(studentId: string, months: string[]): Promise<ActionResult> {
+  const clean = [...new Set(months.filter((m) => /^\d{4}-(0[1-9]|1[0-2])$/.test(m)))].sort();
+  const s = await db.student.update({ where: { id: studentId }, data: { pausedMonths: clean.join(",") } });
+  await db.agentAction.create({ data: { type: "NOTE", familyId: s.familyId, title: clean.length ? `Fee paused for ${s.name}: ${clean.join(", ")}` : `Fee pause cleared for ${s.name}`, status: "DONE", source: "RULES" } });
+  refreshAll();
+  return { ok: true, message: clean.length ? `Paused for ${clean.length} month${clean.length > 1 ? "s" : ""}` : "Pause cleared" };
+}

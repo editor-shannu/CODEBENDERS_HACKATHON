@@ -20,7 +20,7 @@ export type FamilyLite = {
   language: string;
   notes: string;
   memory: string;
-  students: { id: string; name: string; batch: string; monthlyFee: number; dueDay: number; active: boolean }[];
+  students: { id: string; name: string; batch: string; monthlyFee: number; dueDay: number; active: boolean; pausedMonths?: string }[];
   invoices: InvoiceLite[];
   promises: { id: string; promisedDate: Date; amount: number; kept: boolean | null }[];
   reminders: { tone: string; sentAt: Date }[];

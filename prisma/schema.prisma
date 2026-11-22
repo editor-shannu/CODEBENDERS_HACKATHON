@@ -42,8 +42,9 @@ model Student {
   name       String
   batch      String
   monthlyFee Int
-  dueDay     Int
-  active     Boolean @default(true)
+  dueDay       Int
+  active       Boolean @default(true)
+  pausedMonths String  @default("") // Fee Pause: comma-separated YYYY-MM months with no invoice
 }
 
 model Invoice {

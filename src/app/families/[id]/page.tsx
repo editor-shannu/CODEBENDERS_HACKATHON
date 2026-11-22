@@ -15,6 +15,8 @@ import { balanceOf, isOverdue } from "@/lib/invoice-status";
 import { formatDate, formatMonth, relativeDue, toKey } from "@/lib/dates";
 import { formatINR } from "@/lib/money";
 import { memoryOf } from "@/lib/munshi/rules";
+import { FeePause } from "@/components/students/FeePause";
+import { addMonths, formatMonthShort, monthKey, monthStart } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -79,7 +81,8 @@ export default async function FamilyPage({ params }: { params: Promise<{ id: str
                   <div key={s.id} className="flex items-center justify-between px-4 py-3">
                     <div>
                       <p className={`font-display text-xl ${s.active ? "" : "line-through opacity-50"}`}>{s.name}</p>
-                      <p className="font-mono text-[11px] text-dusk-deep/60">{s.batch} · due on the {s.dueDay}</p>
+                      <p className="font-mono text-[11px] text-dusk-deep/60">{s.batch} · due on the {s.dueDay}{s.pausedMonths ? ` · fee paused ${s.pausedMonths.split(",").map(formatMonthShort).join(", ")}` : ""}</p>
+                      {s.active && <FeePause studentId={s.id} paused={(s.pausedMonths ?? "").split(",").filter(Boolean)} months={[0, 1, 2, 3].map((i) => { const k = monthKey(addMonths(monthStart(today), i)); return { key: k, label: formatMonthShort(k) }; })} />}
                     </div>
                     <div className="flex items-center gap-3">
                       <MoneyText amount={s.monthlyFee} className="text-sm" />

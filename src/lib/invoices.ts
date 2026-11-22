@@ -5,11 +5,17 @@ import { addDays, dateInMonth, todayIST } from "./dates";
 import { computeStatus, sumPaid } from "./invoice-status";
 import { familyMonthlyFee } from "./family-stats";
 
+/** True when a student's Fee Pause covers the month (YYYY-MM). */
+export function isPaused(pausedMonths: string | null | undefined, month: string): boolean {
+  return (pausedMonths ?? "").split(",").map((m) => m.trim()).includes(month);
+}
+
 /** Creates one family's invoice for a month (sibling discount applied). Returns null when it exists or no student is active. */
 export async function createInvoiceFor(familyId: string, month: string, status: "DRAFT" | "SENT" = "DRAFT") {
   const f = await db.family.findUnique({ where: { id: familyId }, include: { students: true, invoices: { where: { month } } } });
   if (!f || f.invoices.length) return null;
-  const active = f.students.filter((s) => s.active);
+  // Fee Pause: a student paused for this month is left off the invoice
+  const active = f.students.filter((s) => s.active && !isPaused(s.pausedMonths, month));
   if (!active.length) return null;
   const sorted = [...active].sort((a, b) => b.monthlyFee - a.monthlyFee);
   const amount = familyMonthlyFee(active);
