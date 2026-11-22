@@ -25,7 +25,7 @@
 
 ## 😩 The problem
 
-A home tutor in Visakhapatnam teaches 18 kids. Fees come in cash, PhonePe, GPay, half now and half "next week". Rent is due on the 1st. Chasing parents feels awkward, a notebook *khata* gets lost, and nobody can say **"will I make rent this month?"**
+A home tutor in Andhra Pradesh teaches 18 kids. Fees come in cash, PhonePe, GPay, half now and half "next week". Rent is due on the 1st. Chasing parents feels awkward, a notebook *khata* gets lost, and nobody can say **"will I make rent this month?"**
 
 **Baaki turns that notebook into a calm, private back office that fits in one hand.**
 
@@ -100,7 +100,6 @@ Munshi is a clerk, not a chatbot. It knows your dashboard, remembers the convers
 | `What if Venkatesh pays 15 days late?` | Re-runs the forecast and shows the change |
 | `Plan to collect dues this week` | Builds a who-to-call-when plan |
 | `Make an invoice for Venkatesh` | Creates a one-student invoice with UPI QR |
-| `నమస్తే` / `नमस्ते` | Replies in Telugu or Hindi |
 
 <details>
 <summary>🧠 What if there's no AI key or no internet?</summary>
