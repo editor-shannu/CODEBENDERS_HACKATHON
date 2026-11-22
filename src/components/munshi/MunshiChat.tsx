@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Mic, Send, X } from "lucide-react";
@@ -23,7 +23,9 @@ const LANGS = [
  * Munshi as one chat box on every tutor screen. Type or speak an instruction ("Ravi paid 1500 cash",
  * "add Sita class 8 1200", "remind all late") and Munshi does it; reminders come back as one-tap WhatsApp links.
  */
-export function MunshiChat() {
+export function MunshiChat({ ephemeral = false }: { ephemeral?: boolean }) {
+  // Demo: history lives only for this browser session; real tutors keep it on the device.
+  const store = useCallback(() => (ephemeral ? sessionStorage : localStorage), [ephemeral]);
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
@@ -38,15 +40,15 @@ export function MunshiChat() {
   const loaded = useRef(false);
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem("baaki:munshiHistory") ?? "[]") as Line[];
+      const saved = JSON.parse(store().getItem("baaki:munshiHistory") ?? "[]") as Line[];
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (Array.isArray(saved) && saved.length) setLines(saved.slice(-60));
     } catch {}
     loaded.current = true;
-  }, []);
+  }, [store]);
   useEffect(() => {
-    if (loaded.current) localStorage.setItem("baaki:munshiHistory", JSON.stringify(lines.slice(-60).map((l) => ({ ...l, actions: l.actions?.map((a) => ({ ...a, id: undefined })) }))));
-  }, [lines]);
+    if (loaded.current) store().setItem("baaki:munshiHistory", JSON.stringify(lines.slice(-60).map((l) => ({ ...l, actions: l.actions?.map((a) => ({ ...a, id: undefined })) }))));
+  }, [lines, store]);
 
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "smooth" });
@@ -129,7 +131,7 @@ export function MunshiChat() {
           <div className="mb-2 max-h-[60dvh] overflow-y-auto border border-dusk-deep/30 bg-plaster p-3 text-dusk-deep shadow-none" role="log" aria-live="polite">
             <div className="mb-2 flex items-center justify-between">
               <p className="font-display text-xl">Munshi {mode && <span className="ml-1 align-middle font-mono text-[10px] uppercase tracking-wider text-dusk-deep/60">{mode === "RULES" ? "offline rules" : "online"}</span>}</p>
-              <span className="flex items-center gap-2">{lines.length > 0 && <button type="button" onClick={() => { setLines([]); localStorage.removeItem("baaki:munshiHistory"); }} className="font-mono text-[10px] uppercase tracking-wider text-dusk-deep/60 underline">Clear history</button>}<button type="button" aria-label="Close chat" onClick={() => setOpen(false)} className="min-h-9 min-w-9"><X className="mx-auto size-5" /></button></span>
+              <span className="flex items-center gap-2">{lines.length > 0 && <button type="button" onClick={() => { setLines([]); store().removeItem("baaki:munshiHistory"); }} className="font-mono text-[10px] uppercase tracking-wider text-dusk-deep/60 underline">Clear history</button>}<button type="button" aria-label="Close chat" onClick={() => setOpen(false)} className="min-h-9 min-w-9"><X className="mx-auto size-5" /></button></span>
             </div>
             {!lines.length && (
               <div>

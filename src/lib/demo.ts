@@ -11,9 +11,9 @@ const TENANT_TABLES = [
   "inboxItem", "joinRequest", "agentAction", "agentPlan", "paymentClaim", "payment", "invoice", "reminder", "payPromise", "student", "family", "bill", "keyDate", "settings",
 ] as const;
 
-/** Removes demo accounts older than 12 hours, with every row they own. */
+/** Removes demo accounts older than 2 hours (the browser-session cookie is gone by then), with every row they own. */
 export async function sweepOldDemos() {
-  const cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000);
+  const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000);
   const old = await rawDb.user.findMany({ where: { email: { endsWith: `@${DEMO_EMAIL_DOMAIN}` }, createdAt: { lt: cutoff } }, select: { id: true }, take: 200 });
   if (!old.length) return;
   const ids = old.map((u) => u.id);

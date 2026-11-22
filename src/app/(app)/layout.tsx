@@ -16,7 +16,7 @@ export default async function TutorLayout({ children }: { children: ReactNode })
       <OfflineSupport />
       {children}
       <div className="h-20" aria-hidden="true" />
-      <MunshiChat />
+      <MunshiChat ephemeral={isDemoEmail(user.email)} />
     </>
   );
 }

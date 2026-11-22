@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { SESSION_COOKIE, SESSION_DAYS } from "@/lib/auth/config";
+import { SESSION_COOKIE } from "@/lib/auth/config";
 import { signSession } from "@/lib/auth/token";
 import { createDemoUser } from "@/lib/demo";
 
@@ -19,7 +19,7 @@ export async function GET(req: Request) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: SESSION_DAYS * 24 * 60 * 60,
+      // No maxAge: a browser-session cookie, so closing the browser ends the demo. The data is swept later.
     });
     res.headers.set("Cache-Control", "no-store");
     return res;
