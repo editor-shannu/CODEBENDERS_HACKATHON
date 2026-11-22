@@ -430,7 +430,24 @@ async function rulesAnswer(q: string, ctx: Ctx): Promise<AskResult> {
   const lateWords = /(remind|chase|message|send)\s+(all|every|everyone|the late|late|pending)|remind (them )?all|send reminders|chase everyone|andariki|sabko/.test(s);
   const whoOwes = /who (hasn'?t|has not|didn'?t|did not|not|is yet to) pa(id|y)|who owes|who is (pending|late)|evaru (ivvaledu|kattaledu)|kisne nahi|pending (list|families)|baaki list/.test(s);
 
-  if (addMatch) {
+  const first = ctx.tutorName.split(" ")[0] || "";
+  const owingNow = ctx.families.filter((f) => f.stats.balance > 0).sort((a, b) => b.stats.balance - a.stats.balance);
+  const nextStep = owingNow.length ? ` ${owingNow[0].parentName} is the biggest one: ${formatINR(owingNow[0].stats.balance)}, ${owingNow[0].stats.oldestDaysLate} days late. Want me to draft a reminder?` : " Everyone's paid up.";
+  const smallTalk = s.replace(/[^a-z\s']/g, " ").trim();
+  if (/^(hi+|hey+|hello+|namaste|namaskaram|good (morning|afternoon|evening)|yo|sup)\b/.test(smallTalk) && smallTalk.split(/\s+/).length <= 4) {
+    answer = `Namaskaram${first ? ` ${first} garu` : ""}! ${owingNow.length ? `${formatINR(ctx.totalPending)} is pending from ${owingNow.length} families today.` : "Nothing is pending today."}${nextStep}`;
+  } else if (/^(bye+|good ?night|see you|later|ok bye|tata)\b/.test(smallTalk)) {
+    answer = `Bye${first ? ` ${first} garu` : ""}! I'll keep watching the fees.${owingNow.length ? ` ${formatINR(ctx.totalPending)} is still pending; I'll remind you tomorrow.` : ""}`;
+  } else if (/^(thanks?|thank you|thx|ty|dhanyavaad|ok+|okay|cool|nice|great)\b/.test(smallTalk) && smallTalk.split(/\s+/).length <= 4) {
+    answer = `Anytime.${nextStep}`;
+  } else if (/\b(fuck|shit|damn|idiot|stupid|useless|bc|mc)\b/.test(smallTalk)) {
+    answer = `Sounds like a rough day. Let me take something off your plate.${nextStep}`;
+  } else if (/\b(help|what can you do|how (do|does) (this|you) work|commands?)\b/.test(smallTalk)) {
+    answer = `I'm your fee clerk. Try: "who owes the most", "remind everyone who's late", "Ravi paid 1500 cash", "what if Venkatesh pays 15 days late", "will I make rent?" or "add Sita class 8 ₹1500".`;
+  } else if (/\b(my money|how much (do i have|money|have i)|balance|income|earn|earning|collected|kitna aaya|entha vachindi)\b/.test(smallTalk) && !named) {
+    const r = (await call("get_rent_risk")) as { rentDate?: string; amount?: number; riskOfShortfall?: string; daysUntil?: number };
+    answer = `${formatINR(ctx.totalPending)} is still owed to you by ${owingNow.length} families.${r.rentDate ? ` Rent of ${formatINR(r.amount!)} is due in ${r.daysUntil} days, with a ${r.riskOfShortfall} chance you're short.` : ""}${owingNow.length ? ` Collecting from ${owingNow[0].parentName.split(" ")[0]} first helps most.` : ""}`;
+  } else if (addMatch) {
     const child = addMatch[1].replace(/\b(student|the|a|my|class|std|in|to|fee|rs|for|mother|father|parent)\b/gi, "").replace(/\s+/g, " ").trim();
     const cls = s.match(/\b(?:class|std)\s*(\d{1,2})\b/) ?? s.match(/\b(\d{1,2})(?:st|nd|rd|th)\s*(?:class|std)?\b/);
     const parent = q.match(/\b(?:mother|father|parent|amma|nanna|mom|dad)\s+(?:is\s+)?([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/i)?.[1] ?? q.match(/\b(?:parent|mother|father)\s*:\s*([A-Za-z ]{2,40})/i)?.[1];
@@ -508,7 +525,7 @@ async function rulesAnswer(q: string, ctx: Ctx): Promise<AskResult> {
     answer = `${formatINR(r.totalPending)} is pending across ${r.familiesOwing} families.`;
   } else {
     const r = (await call("list_owing_families", { limit: 3 })) as { parent: string; owes: number; daysLate: number }[];
-    answer = r.length ? `Chase these first: ${r.map((x) => `${x.parent} (${formatINR(x.owes)}, ${x.daysLate} days late)`).join("; ")}.` : "Nobody owes anything right now.";
+    answer = r.length ? `I didn't quite catch that. Here's what needs you today: chase these first: ${r.map((x) => `${x.parent} (${formatINR(x.owes)}, ${x.daysLate} days late)`).join("; ")}. You can also say "help" to see what I can do.` : "Nobody owes anything right now. Say \"help\" to see what I can do.";
   }
   trace.push({ kind: "answer", text: answer });
   return { answer, trace, source: "RULES", chart, actions, links };
@@ -523,14 +540,14 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
   const results: unknown[] = [];
   const whatIfs: Parameters<typeof whatIfSentence>[0][] = [];
   const byTool: Record<string, unknown> = {};
-  const deadline = Date.now() + 5_000; // over 5 s in the model: fall back to the offline rules
+  const deadline = Date.now() + 15_000; // each model call gets 5 s; the whole loop at most 15 s, then the offline rules
   const messages: Msg[] = [
     { role: "system", content: munshiSystemPrompt(ctx) },
     { role: "user", content: question },
   ];
   try {
     for (let i = 0; i < 6; i++) {
-      const msg = await chat(messages, TOOLS, false, Math.max(500, deadline - Date.now()));
+      const msg = await chat(messages, TOOLS, false, Math.max(500, Math.min(5_000, deadline - Date.now())));
       if (msg.tool_calls?.length) {
         messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
         for (const tc of msg.tool_calls) {

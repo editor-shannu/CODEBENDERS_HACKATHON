@@ -66,7 +66,9 @@ export function PlanPicker({ signedIn, current, until, initial, dark = false }: 
         currency: "INR",
         name: "Baaki",
         description: o.label,
-        prefill: { name: o.name, email: o.email },
+        prefill: { name: o.name, email: o.email, contact: "" },
+        remember_customer: false,
+        readonly: { contact: false },
         theme: { color: "#1b2444" },
         handler: async (r: RzpResponse) => {
           const v = await fetch("/api/billing/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(r) });
