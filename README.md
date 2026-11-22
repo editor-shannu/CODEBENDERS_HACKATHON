@@ -1,131 +1,188 @@
 # Baaki
 
-**The back office for home tutors.** Who owes, what's coming, and a clerk that chases for you.
+**The back office for home tutors.** Who owes, what is coming, and a clerk that chases payments for you.
 
-Baaki (Telugu/Hindi for "what's still due") replaces the fee notebook and the awkward WhatsApp follow-up for India's solo home tutors. The demo runs for **Lakshmi Teaching Point**, a home tuition centre in Hyderabad, run by Lakshmi Devi, who teaches maths and science to classes 6 to 10.
+Baaki is a Next.js web application for tutors and tuition centres to track rent and fee collection. It shows what each family owes, what has been paid, generates invoices with payment links, and forecasts upcoming cash flow. It replaces the fee notebook and the manual WhatsApp follow-up that many solo tutors rely on.
 
 Live demo: https://codebendershackathon.vercel.app
 
-## The problem
+## Problem
 
-Millions of home tutors in India collect fees in cash and UPI, track them in a notebook, and chase parents one WhatsApp message at a time. They don't know who's late until rent is due, and every reminder risks souring a relationship with a family they see every evening.
+Many home tutors in India collect fees in cash and UPI, record them in a notebook, and follow up with parents one WhatsApp message at a time. There is no simple view of who owes what, and chasing late payments is slow and awkward.
 
-## What Baaki does
+## Key features
 
-- **Who-owes board**: every family's balance, how many days late, and promises made, computed live from today's date in IST.
-- **Chase Queue**: swipe right to remind, left to snooze. Families are ranked by a chase score built from amount, lateness, broken promises and reminder history.
-- **Tone Dial reminders**: Gentle, Firm or Final WhatsApp messages in **Telugu, Hindi or English**, matched to each family's language, with a UPI pay link inside.
-- **Cash-flow forecast**: a cone chart of likely collections against upcoming bills such as rent, with festival and exam seasons slowing collections.
-- **Munshi**: a clerk with a daily brief, a Rent Defense Plan, an approval inbox, a Reply Reader that turns "sir next week pakka istanu" into a dated promise, and Ask Munshi (an AI agent loop with tool calls and a visible trace). With no `LLM_API_KEY` it runs on offline rules, so the demo never breaks.
-- **Forecast**: a 500-run Monte Carlo cash cone, rent risk, runway, money weather, and Time Machine sliders (late payers, dropouts, fee raise, new admissions).
-- **Invoices**: monthly generation with sibling discount, UPI QR, Download PDF (print), and a public Parent Pay Link with an "I've paid" button the tutor confirms in one tap.
-- **Students, families, settings**: add or edit students, siblings, bills, festival and exam dates, the Munshi autonomy dial, and a one-tap demo reset.
-- **Privacy**: Baaki stores no parent phone numbers. Reminders open WhatsApp with the message ready, and the tutor picks the chat.
+- **Who-owes board** (`/owes`): each family's balance, days late, and promises to pay, computed live from today's date in IST.
+- **Chase queue**: families ranked by a chase score based on amount owed, lateness, and broken promises.
+- **Tone-based reminders**: Gentle, Firm, or Final WhatsApp messages in Telugu, Hindi, or English, with a UPI payment link. Reminders open WhatsApp with the message prepared; the tutor chooses the chat.
+- **Munshi assistant** (`/munshi`): a daily brief, a Rent Defense Plan, an approval inbox, and a reply reader that converts informal promises into dated commitments. Requires an LLM API key.
+- **Forecast** (`/forecast`): a Monte Carlo cash-flow cone (500 runs), rent risk, runway, and what-if sliders for late payers, dropouts, fee changes, and new admissions. Festival and exam seasons are factored in.
+- **Invoices** (`/invoices`): monthly generation, UPI QR codes, printable PDF download, and a public parent payment page (`/pay/[token]`) with an "I've paid" button.
+- **Students and families**: add and edit students, siblings, bills, festival and exam dates, and settings, including a demo reset.
 - **Sibling discount**: 10% off the second and later child, applied automatically to invoices.
+- **Privacy**: parent phone numbers are not stored.
 
 ## Tech stack
 
-Next.js 16 (App Router, Server Actions) · React 19 · TypeScript · Prisma + PostgreSQL · Tailwind CSS 4 · Zod · Recharts · Vitest
+| Area | Technology |
+| --- | --- |
+| Language | TypeScript 5 |
+| Framework | Next.js 16 (App Router, Server Actions), React 19 |
+| Database | PostgreSQL with Prisma 6 |
+| Styling | Tailwind CSS 4 |
+| Landing scene | React Three Fiber / three.js |
+| Charts | Recharts |
+| Validation | Zod |
+| Testing | Vitest |
 
-Design system "Ledger Noir": ink, ledger cream, khata red, turmeric and mint; Fraunces headings and IBM Plex Mono numbers on ruled paper.
+## Getting started
 
-## Run it locally
+### Prerequisites
 
-Requirements: Node 20+ and a Postgres database (local, Neon or Supabase).
+- Node.js 20 or later
+- A PostgreSQL database: local, [Neon](https://neon.tech), or [Supabase](https://supabase.com)
+
+### 1. Clone and install
 
 ```bash
 git clone https://github.com/editor-shannu/CODEBENDERS_HACKATHON.git
 cd CODEBENDERS_HACKATHON
 npm install
-cp .env.example .env        # set DATABASE_URL
-npm run db:push             # create tables
-npm run db:seed             # optional: demo data (also seeds itself on first visit)
-npm run dev                 # http://localhost:3000
 ```
 
-| Script | What it does |
+`npm install` runs `prisma generate` automatically through the `postinstall` script.
+
+### 2. Configure the environment
+
+Copy the example file and set your database connection string.
+
+Windows (Command Prompt or PowerShell):
+
+```powershell
+copy .env.example .env
+```
+
+or, in PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Then edit `.env` and set `DATABASE_URL`. See [Environment variables](#environment-variables) for all options.
+
+### 3. Create the database tables
+
+```bash
+npm run db:push
+```
+
+Optionally, load demo data:
+
+```bash
+npm run db:seed
+```
+
+### 4. Start the development server
+
+```bash
+npm run dev
+```
+
+Open http://localhost:3000 in your browser.
+
+## Available scripts
+
+| Script | Description |
 | --- | --- |
-| `npm run dev` | Dev server |
-| `npm run build` | Generates the Prisma client, syncs the schema if `DATABASE_URL` is set, builds Next.js |
+| `npm run dev` | Start the Next.js development server |
+| `npm run build` | Generate the Prisma client, push the schema if `DATABASE_URL` is set, then build Next.js (via `scripts/build.mjs`) |
+| `npm start` | Start the production server (run after `npm run build`) |
+| `npm run lint` | Run ESLint |
+| `npm test` | Run Vitest |
 | `npm run db:push` | Push the Prisma schema to the database |
 | `npm run db:seed` | Reset and seed the demo centre, dated from today |
-| `npm run lint` / `npm test` | ESLint / Vitest |
 
-## Deploy on Vercel
+## Environment variables
 
-1. Import the repo in Vercel.
-2. Add a Postgres database (Vercel → Storage → Neon, or any Neon/Supabase URL) and set `DATABASE_URL` in Project → Settings → Environment Variables. Use the pooled connection string with `?sslmode=require`.
-3. Deploy. The build creates the tables and the app seeds the demo centre on its first visit.
-
-If `DATABASE_URL` is missing or wrong, the app shows a setup screen explaining what to fix instead of crashing.
-
-### Environment variables
-
-| Name | Required | Notes |
+| Variable | Required | Description |
 | --- | --- | --- |
-| `DATABASE_URL` | Yes | Postgres connection string |
-| `LLM_API_KEY` | No | For the Munshi AI agent (any OpenAI-compatible endpoint) |
-| `LLM_BASE_URL` | No | Defaults to Gemini's OpenAI-compatible endpoint |
-| `LLM_MODEL` | No | Defaults to `gemini-2.5-flash` |
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `LLM_API_KEY` | For Munshi AI | API key for the Munshi assistant. Empty by default |
+| `LLM_BASE_URL` | No | OpenAI-compatible endpoint. Defaults to `https://generativelanguage.googleapis.com/v1beta/openai` (Google Gemini) |
+| `LLM_MODEL` | No | Model name. Defaults to `gemini-2.5-flash` |
+
+Do not commit `.env` to version control.
 
 ## Project structure
 
+```text
+src/
+  app/                  Routes (pages) and server actions in actions.ts
+  components/          Components grouped by feature, plus ui/ and landing/
+  lib/                  Shared logic:
+    data.ts               data access
+    db.ts                 Prisma client
+    forecast.ts           cash-flow forecast
+    money.ts              money handling (whole rupees)
+    dates.ts              IST date engine
+    upi.ts                UPI payment links
+    validators.ts         Zod validation
+    board-view.ts         who-owes board view
+    messages.ts           reminder messages
+    munshi/
+      agent.ts            Munshi assistant logic
+      rules.ts            Munshi rules
+prisma/
+  schema.prisma         database schema
+  seed.ts               demo data seed script
+docs/
+  SPEC.md               product specification and build order
+scripts/
+  build.mjs             build script (Prisma generate, db push, Next.js build)
+public/                 Static assets, including 3D textures in public/3d
 ```
-prisma/          schema and seed script
-src/app/         pages (/, /owes) and server actions
-src/components/  UI primitives, Chase Queue, forecast, reminders
-src/lib/         IST date engine, invoice status, forecast, messages, UPI links, Munshi rules
-docs/SPEC.md     product spec and build order
-```
 
-## Landing
+### Application routes
 
-`/` is a landing page that tells one month of a tuition centre in one scroll. It is a
-tilt-shift miniature of a Hyderabad colony lane at dusk: plastered houses with balconies and
-iron grills, tulsi pots, a neem tree, an Irani chai stall with steam, autos and a scooter,
-tangled wires, a clothes line, and Lakshmi Teaching Point on the first floor with a
-hand-painted signboard. Charminar sits hazy on the far skyline. Each house is one family, and
-its window shows the fee status: lit means paid.
+| Route | Purpose |
+| --- | --- |
+| `/` | Landing page |
+| `/home` | Tutor dashboard |
+| `/owes` | Who-owes board and chase queue |
+| `/forecast` | Cash-flow forecast |
+| `/munshi` | Munshi AI assistant |
+| `/parent` | Parent view |
+| `/students` | Student list |
+| `/students/new` | Add a student |
+| `/students/[id]/edit` | Edit a student |
+| `/families/[id]` | Family detail |
+| `/invoices` | Invoice list |
+| `/invoices/[id]` | Invoice detail |
+| `/pay/[token]` | Public parent payment page |
+| `/settings` | Settings |
 
-Chapters (flat HTML text over the canvas, pinned with GSAP ScrollTrigger, smoothed with Lenis):
+## Deployment
 
-1. **Day 1**: the camera glides down from above the city. "Every rupee you're owed, on one street." Every window is dark.
-2. **Day 5**: invoice slips flutter from the centre's window to each doorstep.
-3. **Day 10**: windows light up as families pay, with a collected vs owed counter. "Lit means paid."
-4. **Day 15**: promised houses flicker dimly, with a Munshi note about the promise.
-5. **Day 20**: clouds roll in if the forecast says rent is at risk; the rent clock on the centre's wall counts down.
-6. **Day 25**: a chalk line on the road joins the three houses of the Rent Defense Plan, which light in turn.
-7. **Rent day**: night, every window lit, Charminar lit. "Rent's safe. Go teach."
-8. **Selection**: the camera settles on the teaching point's window. "I run the centre" dives into it and opens `/home`; "I'm a parent" opens `/parent` (pick a family or paste a pay link).
+Baaki is designed to deploy on [Vercel](https://vercel.com) with a Neon or Supabase PostgreSQL database.
 
-Names and amounts come from the live database (`loadDashboard`, up to 12 houses); if the
-database is empty or unreachable, a built-in demo street is shown. "Skip to dashboard" is in the
-corner from the first frame.
+1. Import the repository into Vercel.
+2. Add a PostgreSQL database (through Vercel Storage with Neon, or any Neon or Supabase connection URL) and set `DATABASE_URL` in Project → Settings → Environment Variables. Set `LLM_API_KEY` as well if you want the Munshi features.
+3. Deploy. The build script pushes the schema to the database when `DATABASE_URL` is set, and the app seeds the demo centre on its first visit.
 
-Performance and fallbacks: the canvas is a client component loaded with `next/dynamic`
-(`ssr: false`) over a flat SVG poster, so the page paints before WebGL loads. DPR is capped at
-1.5; drei's `PerformanceMonitor` drops tilt-shift and shadows when frames fall, and switches to
-the poster if they keep falling. The render loop pauses when the page is hidden. With
-`prefers-reduced-motion`, no WebGL, or low FPS, the poster changes per chapter with the same text,
-and scrolling and the selection still work.
+## Design decisions
 
-All geometry is procedural (three.js boxes, cylinders, cones and tubes); no 3D models are used.
+- **Every date is IST and computed live.** Overdue status and days late are never stored, so the demo is always correct on the day it is shown.
+- **Money is stored as whole rupees** (integers), which avoids floating-point errors.
+- **Enums are Zod-validated strings**, which keeps the schema portable.
 
-### Asset credits
+## Asset credits
 
-All from [Poly Haven](https://polyhaven.com), licensed CC0, stored in `public/3d` (1K source,
-textures re-encoded to WebP):
+Landing scene assets are from [Poly Haven](https://polyhaven.com), licensed CC0, and stored in `public/3d`:
 
 - HDRI sky: [Kloppenheim 06 (Pure Sky)](https://polyhaven.com/a/kloppenheim_06_puresky) by Greg Zaal, sky edits by Jarod Guest
 - Texture: [Painted Plaster Wall](https://polyhaven.com/a/painted_plaster_wall) by Amal Kumar
 - Texture: [Clay Roof Tiles 02](https://polyhaven.com/a/clay_roof_tiles_02) by Amal Kumar
 - Texture: [Dirt](https://polyhaven.com/a/dirt) by Charlotte Baglioni
-
-## Design decisions
-
-- **Every date is IST and computed live.** Overdue status and days late are never stored, so the demo is always correct on the day it is shown.
-- **Money is whole rupees** (integers), avoiding floating-point errors.
-- **Enums are Zod-validated strings**, keeping the schema portable.
 
 ## Roadmap
 
@@ -134,3 +191,8 @@ WhatsApp Business API sending · tests for the forecast and date engine · multi
 ## Team
 
 Built for the Codebenders Hackathon.
+
+## License
+
+Not yet specified.
+
