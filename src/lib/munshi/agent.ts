@@ -84,8 +84,16 @@ export function parseReplyRules(text: string, today: Date, balance: number): Rea
 
 
 /** Code-built what-if sentence: every amount and percentage comes from the tool result, never the model. */
+/** An honest, kind plan to collect what's owed, built from the real balances. */
+export function collectionPlan(ctx: Pick<Ctx, "families" | "totalPending">): string {
+  const owing = ctx.families.filter((f) => f.stats.balance > 0).sort((a, b) => b.stats.balance - a.stats.balance);
+  if (!owing.length) return "Everyone's paid up, so there's nothing to collect right now.";
+  const steps = owing.slice(0, 4).map((f, i) => `${i + 1}) ${f.parentName}, ${formatINR(f.stats.balance)}, ${f.stats.oldestDaysLate} days late: send a ${f.stats.suggestedTone.toLowerCase()} reminder with the pay link${f.stats.promisesBroken >= 2 ? " and ask for a firm date" : ""}`);
+  return `Here's a plan to collect ${formatINR(ctx.totalPending)}: ${steps.join("; ")}. Then offer part-payment to anyone struggling and log each promise so I can nudge them on the day. Say "remind everyone who's late" and I'll draft them all now.`;
+}
+
 export function whatIfSentence(r: { scenarioLabel?: string | null; dropBy: string; direction: string; likelyBalanceIn90DaysBefore: number; likelyBalanceIn90DaysAfter: number; rentRiskBefore: string | null; rentRiskAfter: string | null }): string {
-  const lead = r.scenarioLabel ? `If ${r.scenarioLabel}, your` : "Your";
+  const lead = r.scenarioLabel ? `If ${r.scenarioLabel.replace(/^(All|Everyone)\b/, (m) => m.toLowerCase())}, your` : "Your";
   const move = r.dropBy === formatINR(0) ? `would stay about the same (${formatINR(r.likelyBalanceIn90DaysBefore)})` : `would ${r.direction} by roughly ${r.dropBy} (from ${formatINR(r.likelyBalanceIn90DaysBefore)} to ${formatINR(r.likelyBalanceIn90DaysAfter)})`;
   const risk = r.rentRiskBefore ? ` Rent risk goes from ${r.rentRiskBefore} to ${r.rentRiskAfter}.` : "";
   return `${lead} likely balance in 90 days ${move}.${risk}`;
@@ -459,6 +467,9 @@ async function rulesAnswer(q: string, ctx: Ctx): Promise<AskResult> {
     answer = `Anytime.${nextStep}`;
   } else if (/\b(fuck|shit|damn|idiot|stupid|useless|bc|mc)\b/.test(smallTalk)) {
     answer = `Sounds like a rough day. Let me take something off your plate.${nextStep}`;
+  } else if (/\b(plan|strategy|trick|tips?|ideas?|how (do|can|should) i (collect|get|recover))\b/.test(smallTalk) && /\b(collect|dues|fees|money|pending|recover|baaki|payment)/.test(smallTalk)) {
+    await call("list_owing_families", { limit: 20 });
+    answer = collectionPlan(ctx);
   } else if (/\b(help|what can you do|how (do|does) (this|you) work|commands?)\b/.test(smallTalk)) {
     answer = `I'm your fee clerk. Try: "who owes the most", "remind everyone who's late", "Ravi paid 1500 cash", "what if Venkatesh pays 15 days late", "will I make rent?" or "add Sita class 8 ₹1500".`;
   } else if (/\b(my money|how much (do i have|money|have i)|balance|income|earn|earning|collected|kitna aaya|entha vachindi)\b/.test(smallTalk) && !named) {
@@ -563,7 +574,7 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
   const byTool: Record<string, unknown> = {};
   const deadline = Date.now() + 15_000; // each model call gets 5 s; the whole loop at most 15 s, then the offline rules
   const messages: Msg[] = [
-    { role: "system", content: munshiSystemPrompt(ctx) + "\n" + dashboardSnapshot(ctx) + "\nYou are the tutor's personal assistant: warm, brief, proactive. Reply to small talk naturally, use the conversation so far to resolve 'him', 'her' or 'that family', act with tools when asked to do something on the dashboard, and end with one helpful next step. If the tutor corrects you (\"not 20 days, 20 people\"), redo the task with the correction instead of asking again; when a number of people or families pay late without a day count, call run_what_if with lateFamilies and assume 15 days, and say you assumed it. Never ask a question you can answer from the dashboard snapshot or the conversation." },
+    { role: "system", content: munshiSystemPrompt(ctx) + "\n" + dashboardSnapshot(ctx) + "\nYou are the tutor's personal assistant: warm, brief, proactive. Reply to small talk naturally, use the conversation so far to resolve 'him', 'her' or 'that family', act with tools when asked to do something on the dashboard, and end with one helpful next step. If the tutor corrects you (\"not 20 days, 20 people\"), redo the task with the correction instead of asking again; when a number of people or families pay late without a day count, call run_what_if with lateFamilies and assume 15 days, and say you assumed it. Never ask a question you can answer from the dashboard snapshot or the conversation. \"Trick\", \"hack\" or \"strategy\" to collect dues means an honest, polite collection plan: never refuse it; give 3 or 4 concrete steps naming the families who owe most, with tone and pay link, then offer to draft the reminders." },
     ...(ctx.history ?? []).map((h) => ({ role: (h.who === "you" ? "user" : "assistant") as "user" | "assistant", content: h.text })),
     { role: "user", content: question },
   ];
@@ -594,6 +605,12 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
       const checked = checkAmounts(answer, numbersIn(results));
       if (checked !== answer) trace.push({ kind: "think", text: "Guardrail: dropped an amount that no tool returned." });
       answer = checked;
+      if (/^(i'?m sorry|sorry|i can'?t|i cannot|i am unable|i'?m unable)/i.test(answer) || /can'?t help with that/i.test(answer)) {
+        // The model refused something harmless (e.g. "a trick to collect dues"): answer from the rules instead.
+        trace.push({ kind: "think", text: "Model declined; answered from the rules." });
+        const r = await rulesAnswer(question, ctx);
+        return { ...r, trace: [...trace, ...r.trace], source: "RULES" };
+      }
       if (whatIfs.length) {
         // Numbers come from code; the model only adds advice (sentences without amounts or percentages).
         const advice = answer.split(/(?<=[.!?])\s+/).filter((x) => x && !/[₹%\d]/.test(x)).slice(0, 1).join(" ");
