@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { seatError } from "@/lib/billing/seats";
 import { db } from "@/lib/db";
 import { addDays, fromKey, monthKey, todayIST, toKey } from "@/lib/dates";
 import { sumPaid } from "@/lib/invoice-status";
@@ -99,6 +100,8 @@ export async function saveStudent(input: Record<string, unknown> & { id?: string
     refreshAll();
     return { ok: true, message: "Saved" };
   }
+  const seat = await seatError(await currentUserId());
+  if (seat) return { ok: false, error: seat };
   let familyId = d.familyId;
   if (!familyId) {
     if (!d.parentName || d.parentName.length < 2) return { ok: false, error: "Add the parent's name" };

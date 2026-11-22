@@ -30,6 +30,8 @@ export async function getSettings(): Promise<SettingsRow> {
       autonomy: "ASK",
       monthlyGoal: 0,
       joinCode: null,
+      plan: "FREE",
+      planUntil: null,
     }
   );
 }

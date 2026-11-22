@@ -33,6 +33,8 @@ model Settings {
   autonomy        String @default("ASK") // SUGGEST | ASK | AUTO
   monthlyGoal     Int    @default(0) // Goal Mode: rupees to collect this month (0 = off)
   joinCode        String? // public code for the parent self-join link (/join/[code])
+  plan            String    @default("FREE") // FREE | PRO | CENTRE
+  planUntil       DateTime? // paid plans run until this date, then fall back to FREE
 
   @@index([joinCode])
 }
@@ -230,6 +232,21 @@ model InboxItem {
   image     String   @default("") // data URL, payment screenshots only
   status    String   @default("NEW") // NEW | DONE
   createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+/** Baaki's own subscription payments (tutor pays Baaki via Razorpay). Not tenant data: always queried by userId. */
+model BillingOrder {
+  id        String   @id @default(cuid())
+  userId    String
+  plan      String // PRO_MONTH | PRO_YEAR | CENTRE_MONTH
+  amount    Int // paise
+  orderId   String   @unique // Razorpay order id
+  paymentId String?
+  status    String   @default("CREATED") // CREATED | PAID | FAILED
+  createdAt DateTime @default(now())
+  paidAt    DateTime?
 
   @@index([userId])
 }

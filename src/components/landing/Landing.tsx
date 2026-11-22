@@ -197,20 +197,6 @@ export function Landing({ data }: { data: LandingData }) {
         </button>
       </div>
 
-      {/* date ruler: jump to any day */}
-      <nav aria-label="Days of the month" className="absolute left-1/2 top-3 z-20 hidden -translate-x-1/2 md:flex">
-        {chapters.map((ch, i) => (
-          <button
-            key={ch.id}
-            type="button"
-            onClick={() => go(i)}
-            aria-current={i === active ? "step" : undefined}
-            className={`min-h-11 border-b-2 px-3 font-mono text-[11px] uppercase tracking-[0.12em] ${i === active ? "border-lamp text-lamp" : "border-plaster/20 text-plaster/60 hover:text-plaster"}`}
-          >
-            {i < last - 1 ? dayNum(i) : ch.day}
-          </button>
-        ))}
-      </nav>
     </div>
   );
 }

@@ -8,6 +8,8 @@ import { reminderText, waLink } from "../messages";
 import { memoryOf, ordinal } from "./rules";
 import { MONEY, proposeOrRun, runNow, type WriteType } from "./execute";
 import { db } from "../db";
+import { seatError } from "../billing/seats";
+import { currentUserId } from "../auth/session";
 import { allowedAmounts, checkAmounts, isThreatening, numbersIn } from "./guardrails";
 
 /* ------------------------------------------------------------------ */
@@ -331,6 +333,8 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx, so
       if (child.length < 2) return { result: { error: "Need the child's name" } };
       if (!(fee >= 100 && fee <= 50000)) return { result: { error: "Need the monthly fee (₹100 to ₹50,000)" } };
       if (!ctx.direct) return { result: { error: "Only add students when the tutor asks in chat" } };
+      const seat = await seatError(await currentUserId());
+      if (seat) return { result: { error: seat } };
       const existing = parent ? findFamily(ctx, parent) : undefined;
       const lang = ["te", "en", "hi"].includes(String(args.language)) ? String(args.language) : "te";
       const famId = existing?.id ?? (await db.family.create({ data: { parentName: parent || `${child.split(" ")[0]}'s parent`, language: lang, notes: "Added in Munshi chat" } })).id;
