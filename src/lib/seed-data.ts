@@ -251,5 +251,9 @@ export async function seedDemo(db: PrismaClient, now: Date = new Date()) {
     }
   }
 
+  // Munshi's memory starts from each family's real history
+  const { learnFromHistory } = await import("./munshi/memory");
+  for (const f of await db.family.findMany({ select: { id: true } })) await learnFromHistory(f.id, db);
+
   return { today: fromKey(today.toISOString()), families: FAMILIES.length };
 }

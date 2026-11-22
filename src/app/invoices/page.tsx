@@ -4,7 +4,7 @@ import { HouseStatus, houseStatusOf } from "@/components/ui/HouseStatus";
 import { MoneyText } from "@/components/ui/MoneyText";
 import { Stamp } from "@/components/ui/Stamp";
 import { Guard } from "@/components/setup/Guard";
-import { ClaimButtons, GenerateInvoicesButton } from "@/components/invoices/InvoiceActions";
+import { ClaimButtons, GenerateInvoicesButton, IssueDraftsButton } from "@/components/invoices/InvoiceActions";
 import { db } from "@/lib/db";
 import { balanceOf, isOverdue } from "@/lib/invoice-status";
 import { formatDate, formatMonth, relativeDue, todayIST } from "@/lib/dates";
@@ -18,6 +18,7 @@ const FILTERS = [
   { id: "overdue", label: "Overdue" },
   { id: "paid", label: "Paid" },
   { id: "claims", label: "To confirm" },
+  { id: "drafts", label: "Drafts" },
 ] as const;
 
 export default async function InvoicesPage({ searchParams }: { searchParams: Promise<{ filter?: string; month?: string }> }) {
@@ -35,23 +36,27 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
         const list = invoices
           .filter((i) => !month || i.month === month)
           .filter((i) => {
+            if (filter === "drafts") return i.status === "DRAFT";
+            if (i.status === "DRAFT") return filter === "all";
             const bal = balanceOf(i);
             if (filter === "unpaid") return bal > 0;
             if (filter === "overdue") return isOverdue(i, today);
             if (filter === "paid") return bal === 0;
             return true;
           });
-        const due = list.reduce((s, i) => s + balanceOf(i), 0);
+        const due = list.filter((i) => i.status !== "DRAFT").reduce((s, i) => s + balanceOf(i), 0);
+        const drafts = invoices.filter((i) => i.status === "DRAFT");
         const q = (f: string, m?: string) => `/invoices?filter=${f}${m ? `&month=${m}` : ""}`;
         return (
           <div>
             <PageHeader title="Invoices" kicker={`${list.length} shown · ${formatINR(due)} due`}>
               <GenerateInvoicesButton />
+              {drafts.length > 0 && <IssueDraftsButton label={`Issue all ${drafts.length}`} />}
             </PageHeader>
             <div className="mb-3 flex flex-wrap gap-2">
               {FILTERS.map((f) => (
                 <Link key={f.id} href={q(f.id, month)} className={`min-h-9 border px-3 py-2 font-mono text-[11px] uppercase tracking-widest ${filter === f.id ? "border-lamp bg-lamp text-dusk-deep" : "border-plaster/25"}`}>
-                  {f.label}{f.id === "claims" && claims.length ? ` · ${claims.length}` : ""}
+                  {f.label}{f.id === "claims" && claims.length ? ` · ${claims.length}` : ""}{f.id === "drafts" && drafts.length ? ` · ${drafts.length}` : ""}
                 </Link>
               ))}
             </div>
@@ -90,12 +95,12 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                         <HouseStatus status={houseStatusOf(bal, openPromise.has(inv.familyId))} size={28} />
                         <div className="min-w-0">
                         <p className="truncate font-display text-lg">{inv.family.parentName}</p>
-                        <p className="font-mono text-[11px] text-dusk-deep/60">{inv.number} · {formatMonth(inv.month)} · {bal ? relativeDue(inv.dueDate, today) : "paid"}</p>
+                        <p className="font-mono text-[11px] text-dusk-deep/60">{inv.number} · {formatMonth(inv.month)} · {inv.status === "DRAFT" ? "draft, not issued" : bal ? relativeDue(inv.dueDate, today) : "paid"}</p>
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-3">
-                        {bal === 0 ? <Stamp kind="PAID" /> : isOverdue(inv, today) ? <Stamp kind="OVERDUE" /> : bal < inv.amount ? <Stamp kind="PARTIAL" /> : null}
-                        <MoneyText amount={bal || inv.amount} tone={bal ? "red" : undefined} />
+                        {inv.status === "DRAFT" ? <span className="font-mono text-[11px] uppercase tracking-widest text-dusk-deep/60">Draft</span> : bal === 0 ? <Stamp kind="PAID" /> : isOverdue(inv, today) ? <Stamp kind="OVERDUE" /> : bal < inv.amount ? <Stamp kind="PARTIAL" /> : null}
+                        <MoneyText amount={bal || inv.amount} tone={bal && inv.status !== "DRAFT" ? "red" : undefined} />
                       </div>
                     </Link>
                   );

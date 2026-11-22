@@ -7,7 +7,7 @@ import { ChaseQueue, type QueueCard } from "@/components/owes/ChaseQueue";
 import { loadDashboard } from "@/lib/board-view";
 import { dbHealth } from "@/lib/db-health";
 import { SetupNotice } from "@/components/setup/SetupNotice";
-import { formatMonthShort, formatDate } from "@/lib/dates";
+import { formatMonthShort, formatDate, toKey } from "@/lib/dates";
 import { formatINR } from "@/lib/money";
 import { memoryOf } from "@/lib/munshi/rules";
 import { kidsLabel } from "@/lib/messages";
@@ -34,6 +34,7 @@ export default async function OwesPage() {
       bestTime: memoryOf(f).bestTime,
       payload: payloads[f.id],
       status: houseStatusOf(f.stats.balance, !!f.stats.openPromise),
+      balance: f.stats.balance,
     }));
 
   return (
@@ -52,7 +53,7 @@ export default async function OwesPage() {
         <div className="grid gap-8 md:grid-cols-[1fr_1.3fr]">
           <section>
             <Eyebrow className="mb-3">Chase queue · ranked by who to chase first</Eyebrow>
-            <ChaseQueue cards={cards} />
+            <ChaseQueue cards={cards} today={toKey(board.today)} />
           </section>
           <section>
             <Eyebrow className="mb-3">Oldest first</Eyebrow>

@@ -101,9 +101,12 @@ model Reminder {
   id       String   @id @default(cuid())
   familyId String
   family   Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  tone     String // GENTLE | FIRM | FINAL
-  language String
-  sentAt   DateTime @default(now())
+  tone         String // GENTLE | FIRM | FINAL
+  language     String
+  sentAt       DateTime  @default(now())
+  status       String    @default("SENT") // SENT | SCHEDULED | DONE
+  scheduledFor DateTime? // IST day a scheduled nudge is due (Munshi follow-ups)
+  note         String    @default("")
 }
 
 model Bill {
@@ -129,6 +132,9 @@ model AgentPlan {
   title     String
   goal      String
   status    String        @default("PROPOSED") // PROPOSED | ACTIVE | DONE | DISMISSED
+  gap        Int          @default(0) // rupees the plan has to cover before rent day
+  rentAmount Int          @default(0)
+  rentDate   String       @default("") // YYYY-MM-DD (IST)
   createdAt DateTime      @default(now())
   actions   AgentAction[]
 }

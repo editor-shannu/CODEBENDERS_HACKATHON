@@ -25,9 +25,26 @@ export function memoryOf(f: { memory: string }): Record<string, string> {
 
 const toneWord = (t: string) => t.toLowerCase();
 
-export function buildBrief(opts: { families: FamilyWithStats[]; today: Date; forecast: ForecastResult; pendingClaims: number }): BriefItem[] {
+export function buildBrief(opts: { families: FamilyWithStats[]; today: Date; forecast: ForecastResult; pendingClaims: number; nudges?: { familyId: string; scheduledFor: Date; tone: string; note: string }[] }): BriefItem[] {
   const { families, today, forecast } = opts;
   const items: BriefItem[] = [];
+
+  for (const n of opts.nudges ?? []) {
+    const f = families.find((x) => x.id === n.familyId);
+    if (!f || f.stats.balance <= 0 || n.scheduledFor > today) continue;
+    if (items.some((i) => i.key === `nudge-${f.id}`)) continue;
+    const promise = n.note.startsWith("promise-follow-up");
+    items.push({
+      key: `nudge-${f.id}`,
+      type: "FOLLOW_UP",
+      familyId: f.id,
+      title: promise ? `${f.parentName}'s promised date has passed: follow up` : `Scheduled nudge for ${f.parentName} is due`,
+      detail: `Gentle reminder for ${formatINR(f.stats.balance)}.`,
+      reason: promise ? `Munshi scheduled this the day after the promised ${formatDate(fromKey(n.note.split(" ")[1] ?? ""), { year: false })}.` : `You or Munshi scheduled this for ${formatDate(n.scheduledFor, { year: false })}.`,
+      priority: 75,
+      payload: { tone: n.tone || "GENTLE" },
+    });
+  }
 
   if (opts.pendingClaims > 0)
     items.push({
@@ -85,7 +102,7 @@ export function buildBrief(opts: { families: FamilyWithStats[]; today: Date; for
       type: "REMIND",
       familyId: f.id,
       title: `Chase ${f.parentName}: ${formatINR(s.balance)}, ${s.oldestDaysLate} days late`,
-      detail: `${toneWord(s.suggestedTone)[0].toUpperCase() + toneWord(s.suggestedTone).slice(1)} reminder in ${f.language === "te" ? "Telugu" : f.language === "hi" ? "Hindi" : "English"}${mem.bestTime ? `. Best time: ${mem.bestTime.toLowerCase()}` : ""}.`,
+      detail: `${toneWord(s.suggestedTone)[0].toUpperCase() + toneWord(s.suggestedTone).slice(1)} reminder in ${f.language === "te" ? "Telugu" : f.language === "hi" ? "Hindi" : "English"}${mem.bestTime ? `. Best time: ${mem.bestTime.toLowerCase()}` : ""}${learnedDay(mem) ? `. Usually pays around the ${ordinal(learnedDay(mem)!)}` : ""}.`,
       reason: `Chase score ${s.chaseScore}: ${why.join("; ")}.`,
       priority: 60 - idx * 5,
       payload: { tone: s.suggestedTone },
@@ -95,7 +112,10 @@ export function buildBrief(opts: { families: FamilyWithStats[]; today: Date; for
   for (const f of families) {
     const active = f.students.filter((s) => s.active);
     if (!active.length) continue;
-    const day = paydayPattern(f.stats.payDays, active[0].dueDay);
+    const mem = memoryOf(f);
+    const learned = learnedDay(mem);
+    const fromPayments = paydayPattern(f.stats.payDays, active[0].dueDay);
+    const day = fromPayments ?? (learned && Math.abs(learned - active[0].dueDay) >= 3 ? learned : null);
     if (!day) continue;
     items.push({
       key: `payday-${f.id}`,
@@ -103,7 +123,9 @@ export function buildBrief(opts: { families: FamilyWithStats[]; today: Date; for
       familyId: f.id,
       title: `Move ${f.parentName.split(" ")[0]}'s due date from the ${ordinal(active[0].dueDay)} to the ${ordinal(day)}`,
       detail: `They pay on the ${ordinal(day)} almost every month.`,
-      reason: `Last ${Math.min(4, f.stats.payDays.length)} payments landed on the ${f.stats.payDays.slice(-4).map(ordinal).join(", ")}. Matching their payday stops them showing as late and saves you a reminder.`,
+      reason: fromPayments
+        ? `Last ${Math.min(4, f.stats.payDays.length)} payments landed on the ${f.stats.payDays.slice(-4).map(ordinal).join(", ")}. Matching their payday stops them showing as late and saves you a reminder.`
+        : `Munshi learned: ${mem.salaryDay ?? `usual pay day ${mem.usualPayDay}`}. Matching it stops them showing as late.`,
       priority: 40,
       payload: { dueDay: day },
     });
@@ -112,12 +134,19 @@ export function buildBrief(opts: { families: FamilyWithStats[]; today: Date; for
   return items.sort((a, b) => b.priority - a.priority);
 }
 
+/** Pay day Munshi learned for a family (salary day first, then usual pay day). */
+export function learnedDay(mem: Record<string, string>): number | null {
+  const v = mem.salaryDay?.match(/(\d{1,2})(st|nd|rd|th)/)?.[1] ?? mem.usualPayDay;
+  const n = v ? parseInt(v, 10) : NaN;
+  return n >= 1 && n <= 28 ? n : null;
+}
+
 export function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"], v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-export type PlanStep = { type: "REMIND" | "DISCOUNT" | "DEFER_BILL"; familyId?: string; billId?: string; title: string; detail: string; reason: string; payload: Record<string, unknown> };
+export type PlanStep = { type: "REMIND" | "DISCOUNT" | "DEFER_BILL"; familyId?: string; billId?: string; amount: number; title: string; detail: string; reason: string; payload: Record<string, unknown> };
 
 export function buildRentPlan(opts: {
   families: FamilyWithStats[];
@@ -141,6 +170,7 @@ export function buildRentPlan(opts: {
     steps.push({
       type: "REMIND",
       familyId: f.id,
+      amount: f.stats.balance,
       title: `Chase ${f.parentName} for ${formatINR(f.stats.balance)}`,
       detail: `${f.stats.suggestedTone[0] + f.stats.suggestedTone.slice(1).toLowerCase()} reminder with pay link`,
       reason: `${Math.round(likely * 100)}% likely to pay before rent day if reminded now.`,
@@ -156,6 +186,7 @@ export function buildRentPlan(opts: {
     steps.push({
       type: "DISCOUNT",
       familyId: f.id,
+      amount: Math.max(0, f.stats.monthlyTotal - 100),
       title: `Offer ${f.parentName.split(" ")[0]} ₹100 off to pay next month's ${formatINR(f.stats.monthlyTotal)} early`,
       detail: `Pay by ${formatDate(addDays(rentDate, -2), { year: false })}`,
       reason: `Pays on time every month (${f.stats.delays.length} of ${f.stats.delays.length}), so an early-pay offer is likely to land before rent.`,
@@ -172,6 +203,7 @@ export function buildRentPlan(opts: {
     steps.push({
       type: "DEFER_BILL",
       billId: flex.b.id,
+      amount: flex.b.amount,
       title: `Push "${flex.b.name}" (${formatINR(flex.b.amount)}) by a week`,
       detail: "Ask the vendor for 7 more days",
       reason: "It's marked flexible and falls just before rent.",

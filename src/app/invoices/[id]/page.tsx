@@ -5,7 +5,7 @@ import { Eyebrow } from "@/components/ui/Card";
 import { Stamp } from "@/components/ui/Stamp";
 import { Guard } from "@/components/setup/Guard";
 import { RecordPaymentButton } from "@/components/actions/RecordPayment";
-import { CopyButton, PrintButton } from "@/components/invoices/InvoiceActions";
+import { CopyButton, IssueDraftsButton, PrintButton } from "@/components/invoices/InvoiceActions";
 import { db } from "@/lib/db";
 import { getSettings } from "@/lib/data";
 import { balanceOf, isOverdue, sumPaid } from "@/lib/invoice-status";
@@ -37,9 +37,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2">
               <Link href={`/families/${inv.familyId}`} className="font-mono text-xs text-plaster/70 hover:text-lamp">← {inv.family.parentName}</Link>
               <div className="flex flex-wrap gap-2">
-                <CopyButton text={payUrl} />
+                {inv.status === "DRAFT" ? <IssueDraftsButton ids={[inv.id]} label="Issue invoice" /> : <CopyButton text={payUrl} />}
                 <PrintButton />
-                {bal > 0 && <RecordPaymentButton invoiceId={inv.id} balance={bal} title={`${inv.family.parentName.split(" ")[0]} · ${formatMonth(inv.month)}`} today={toKey(today)} />}
+                {bal > 0 && inv.status !== "DRAFT" && <RecordPaymentButton invoiceId={inv.id} balance={bal} title={`${inv.family.parentName.split(" ")[0]} · ${formatMonth(inv.month)}`} today={toKey(today)} />}
               </div>
             </div>
             <article className="invoice-sheet ruled-paper relative mx-auto max-w-2xl border border-dusk-deep/15 p-6 text-dusk-deep md:p-8">

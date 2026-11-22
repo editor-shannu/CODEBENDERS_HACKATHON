@@ -1,31 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
-import { addDays, dateInMonth, fromKey, monthKey, todayIST, toKey } from "@/lib/dates";
-import { familyMonthlyFee } from "@/lib/family-stats";
-import { computeStatus, sumPaid } from "@/lib/invoice-status";
+import { addDays, fromKey, monthKey, todayIST, toKey } from "@/lib/dates";
+import { sumPaid } from "@/lib/invoice-status";
 import { seedDemo } from "@/lib/seed-data";
+import { settlePlanForBill, settlePlanForPayment } from "@/lib/munshi/plan";
+import { createInvoiceFor, recalcInvoice } from "@/lib/invoices";
+import { learnFromHistory, learnFromReply } from "@/lib/munshi/memory";
 import { billSchema, claimSchema, paymentSchema, promiseSchema, settingsSchema, studentSchema } from "@/lib/validators";
 
 export type ActionResult = { ok: true; message?: string; status?: string } | { ok: false; error: string };
 
 const refreshAll = () => revalidatePath("/", "layout");
-
-async function recalcInvoice(invoiceId: string) {
-  const inv = await db.invoice.findUniqueOrThrow({ where: { id: invoiceId }, include: { payments: true } });
-  const status = computeStatus(inv.amount, sumPaid(inv.payments), inv.status as "SENT");
-  await db.invoice.update({ where: { id: invoiceId }, data: { status } });
-  // a payment keeps any open promise from this family
-  if (status === "PAID") {
-    const today = todayIST();
-    const open = await db.payPromise.findMany({ where: { familyId: inv.familyId, kept: null } });
-    for (const p of open) await db.payPromise.update({ where: { id: p.id }, data: { kept: p.promisedDate >= addDays(today, -1) } });
-    await db.agentAction.updateMany({ where: { familyId: inv.familyId, status: { in: ["PENDING", "APPROVED"] }, type: { in: ["REMIND", "FOLLOW_UP"] } }, data: { status: "DONE" } });
-  }
-  return status;
-}
 
 export async function recordPayment(input: { invoiceId: string; amount: number; mode: string; reference?: string; date?: string }): Promise<ActionResult> {
   const parsed = paymentSchema.safeParse({ ...input, date: input.date ?? toKey(todayIST()) });
@@ -33,10 +20,37 @@ export async function recordPayment(input: { invoiceId: string; amount: number; 
   const { invoiceId, amount, mode, reference, date } = parsed.data;
   const inv = await db.invoice.findUnique({ where: { id: invoiceId }, include: { payments: true } });
   if (!inv) return { ok: false, error: "Invoice not found" };
+  if (inv.status === "DRAFT") return { ok: false, error: "Issue this invoice before recording a payment" };
   const balance = inv.amount - sumPaid(inv.payments);
   if (amount > balance) return { ok: false, error: `Only ${balance} is due on this invoice` };
   await db.payment.create({ data: { invoiceId, amount, mode, reference: reference || null, date: fromKey(date) } });
   const status = await recalcInvoice(invoiceId);
+  await settlePlanForPayment(inv.familyId, amount);
+  await learnFromHistory(inv.familyId);
+  refreshAll();
+  return { ok: true, status };
+}
+
+/** Records one payment for a family, settling its oldest unpaid invoices first (Chase Queue "Mark paid"). */
+export async function recordFamilyPayment(input: { familyId: string; amount: number; mode: string; reference?: string; date?: string }): Promise<ActionResult> {
+  const amount = Math.round(Number(input.amount));
+  if (!Number.isFinite(amount) || amount <= 0) return { ok: false, error: "Enter the amount received" };
+  if (input.mode !== "CASH" && input.mode !== "UPI") return { ok: false, error: "Pick cash or UPI" };
+  const invoices = await db.invoice.findMany({ where: { familyId: input.familyId, status: { not: "DRAFT" } }, include: { payments: true }, orderBy: { dueDate: "asc" } });
+  const open = invoices.map((i) => ({ inv: i, bal: i.amount - sumPaid(i.payments) })).filter((x) => x.bal > 0);
+  const due = open.reduce((s, x) => s + x.bal, 0);
+  if (!open.length) return { ok: false, error: "Nothing is due from this family" };
+  if (amount > due) return { ok: false, error: `Only ${due} is due from this family` };
+  let left = amount;
+  let status = "PARTIAL";
+  for (const { inv, bal } of open) {
+    if (left <= 0) break;
+    const part = Math.min(left, bal);
+    const res = await recordPayment({ invoiceId: inv.id, amount: part, mode: input.mode, reference: input.reference, date: input.date });
+    if (!res.ok) return res;
+    left -= part;
+  }
+  if (amount === due) status = "PAID";
   refreshAll();
   return { ok: true, status };
 }
@@ -53,41 +67,26 @@ export async function addPromise(input: { familyId: string; promisedDate: string
 
 export async function logReminder(familyId: string, tone: string, language: string): Promise<ActionResult> {
   await db.reminder.create({ data: { familyId, tone, language } });
+  // sending clears any nudge that was due by today
+  await db.reminder.updateMany({ where: { familyId, status: "SCHEDULED", scheduledFor: { lte: todayIST() } }, data: { status: "DONE" } });
   refreshAll();
   return { ok: true };
 }
 
 export async function generateMonthInvoices(): Promise<ActionResult> {
-  const today = todayIST();
-  const month = monthKey(today);
-  const families = await db.family.findMany({ include: { students: true, invoices: { where: { month } } } });
-  const count = await db.invoice.count({ where: { month } });
-  let n = count;
+  const month = monthKey(todayIST());
+  const families = await db.family.findMany({ select: { id: true } });
   let created = 0;
-  for (const f of families) {
-    const active = f.students.filter((s) => s.active);
-    if (!active.length || f.invoices.length) continue;
-    const sorted = [...active].sort((a, b) => b.monthlyFee - a.monthlyFee);
-    const amount = familyMonthlyFee(active);
-    const gross = active.reduce((s, x) => s + x.monthlyFee, 0);
-    n++;
-    await db.invoice.create({
-      data: {
-        number: `LTP-${month}-${String(n).padStart(3, "0")}`,
-        familyId: f.id,
-        month,
-        amount,
-        discount: gross - amount,
-        dueDate: dateInMonth(month, sorted[0].dueDay),
-        status: "SENT",
-        payToken: randomBytes(12).toString("base64url"),
-        lines: JSON.stringify(sorted.map((s, i) => ({ name: s.name, batch: s.batch, fee: s.monthlyFee, discount: i === 0 ? 0 : Math.round(s.monthlyFee * 0.1) }))),
-      },
-    });
-    created++;
-  }
+  for (const f of families) if (await createInvoiceFor(f.id, month, "DRAFT")) created++;
   refreshAll();
-  return { ok: true, message: created ? `Created ${created} invoices for this month` : "This month's invoices already exist" };
+  return { ok: true, message: created ? `Created ${created} draft invoices. Check them, then Issue all.` : "This month's invoices already exist" };
+}
+
+/** Issues drafts: they start counting as owed and their pay links work. */
+export async function issueDrafts(input: { ids?: string[] } = {}): Promise<ActionResult> {
+  const r = await db.invoice.updateMany({ where: { status: "DRAFT", ...(input.ids?.length ? { id: { in: input.ids } } : {}) }, data: { status: "SENT" } });
+  refreshAll();
+  return { ok: true, message: r.count ? `Issued ${r.count} invoice${r.count > 1 ? "s" : ""}` : "No drafts to issue" };
 }
 
 export async function saveStudent(input: Record<string, unknown> & { id?: string }): Promise<ActionResult> {
@@ -172,7 +171,7 @@ export async function submitClaim(input: { token: string; amount: number; refere
   const parsed = claimSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the details" };
   const inv = await db.invoice.findUnique({ where: { payToken: parsed.data.token } });
-  if (!inv) return { ok: false, error: "This payment link is not valid" };
+  if (!inv || inv.status === "DRAFT") return { ok: false, error: "This payment link is not valid" };
   await db.paymentClaim.create({ data: { invoiceId: inv.id, amount: parsed.data.amount, reference: parsed.data.reference } });
   refreshAll();
   return { ok: true, message: "Thank you! The teacher will confirm shortly." };
@@ -182,9 +181,12 @@ export async function confirmClaim(id: string): Promise<ActionResult> {
   const claim = await db.paymentClaim.findUnique({ where: { id }, include: { invoice: { include: { payments: true } } } });
   if (!claim || claim.status !== "PENDING") return { ok: false, error: "Already handled" };
   const balance = claim.invoice.amount - sumPaid(claim.invoice.payments);
-  await db.payment.create({ data: { invoiceId: claim.invoiceId, amount: Math.min(balance, claim.amount), mode: "UPI", reference: claim.reference, date: todayIST() } });
+  const paid = Math.min(balance, claim.amount);
+  await db.payment.create({ data: { invoiceId: claim.invoiceId, amount: paid, mode: "UPI", reference: claim.reference, date: todayIST() } });
   await db.paymentClaim.update({ where: { id }, data: { status: "CONFIRMED" } });
   const status = await recalcInvoice(claim.invoiceId);
+  await settlePlanForPayment(claim.invoice.familyId, paid);
+  await learnFromHistory(claim.invoice.familyId);
   refreshAll();
   return { ok: true, status };
 }
@@ -209,8 +211,44 @@ export async function deferBill(billId: string, days: number, reason = ""): Prom
   if (!bill) return { ok: false, error: "Bill not found" };
   await db.bill.update({ where: { id: billId }, data: { deferDays: Math.max(0, Math.min(20, days)) } });
   await db.agentAction.create({ data: { type: "DEFER_BILL", title: `Pushed "${bill.name}" by ${days} days`, reason, status: "DONE", source: "RULES" } });
+  await settlePlanForBill(billId);
   refreshAll();
   return { ok: true, message: `${bill.name} pushed by ${days} days` };
+}
+
+/** Morning Brief "Approve all": approves every actionable brief item, logs each to AgentAction, returns how many. */
+export async function approveAllBrief(): Promise<ActionResult & { count?: number }> {
+  const { loadDashboard } = await import("@/lib/board-view");
+  const { brief, board } = await loadDashboard();
+  const today = board.today;
+  const already = await db.agentAction.findMany({ where: { createdAt: { gte: addDays(today, 0) }, status: { in: ["APPROVED", "DONE"] }, reason: { startsWith: "brief:" } } });
+  const seen = new Set(already.map((a) => a.reason.split(" ")[0]));
+  let count = 0;
+  for (const item of brief) {
+    const tag = `brief:${item.key}`;
+    if (seen.has(tag)) continue;
+    if (item.type === "REMIND" || item.type === "FOLLOW_UP") {
+      await db.agentAction.create({
+        data: { type: item.type, familyId: item.familyId ?? null, title: item.title, detail: item.detail, reason: `${tag} ${item.reason}`, payload: JSON.stringify(item.payload ?? {}), status: "APPROVED", source: "RULES" },
+      });
+      count++;
+    } else if (item.type === "DUE_DATE" && item.familyId) {
+      const dueDay = Number(item.payload?.dueDay);
+      if (dueDay >= 1 && dueDay <= 28) {
+        await db.student.updateMany({ where: { familyId: item.familyId, active: true }, data: { dueDay } });
+        await db.agentAction.create({ data: { type: "DUE_DATE", familyId: item.familyId, title: item.title, reason: `${tag} ${item.reason}`, payload: JSON.stringify({ dueDay }), status: "DONE", source: "RULES" } });
+        count++;
+      }
+    }
+  }
+  // anything Munshi left waiting in the approval inbox that is not a money action is approved too
+  const pending = await db.agentAction.findMany({ where: { status: "PENDING", type: { in: ["REMIND", "FOLLOW_UP", "NOTE", "PROMISE"] } } });
+  for (const a of pending) {
+    await db.agentAction.update({ where: { id: a.id }, data: { status: "APPROVED" } });
+    count++;
+  }
+  refreshAll();
+  return { ok: true, count, message: count ? `Approved ${count} action${count > 1 ? "s" : ""}` : "Nothing left to approve" };
 }
 
 export async function logAgentAction(input: { type: string; title: string; detail?: string; reason?: string; familyId?: string; status?: string; source?: string }): Promise<ActionResult> {
@@ -222,6 +260,15 @@ export async function logAgentAction(input: { type: string; title: string; detai
 }
 
 export async function setActionStatus(id: string, status: "APPROVED" | "DONE" | "SKIPPED"): Promise<ActionResult> {
+  if (status === "DONE") {
+    // approving a Munshi proposal carries it out (payment, promise, nudge, invoice, due date)
+    const { approveAction } = await import("@/lib/munshi/execute");
+    const line = await approveAction(id);
+    if (line) {
+      refreshAll();
+      return { ok: true, message: line };
+    }
+  }
   await db.agentAction.update({ where: { id }, data: { status } });
   refreshAll();
   return { ok: true };
@@ -230,38 +277,104 @@ export async function setActionStatus(id: string, status: "APPROVED" | "DONE" | 
 export async function readReplyAction(familyId: string, text: string) {
   const { parseReply } = await import("@/lib/munshi/agent");
   const { familyStats } = await import("@/lib/family-stats");
+  const { loadDashboard } = await import("@/lib/board-view");
   const f = await db.family.findUnique({
     where: { id: familyId },
-    include: { students: true, invoices: { include: { payments: true } }, promises: true, reminders: true },
+    include: { students: true, invoices: { include: { payments: true } }, promises: true, reminders: { where: { status: "SENT" } } },
   });
   if (!f || !text.trim()) return { ok: false as const, error: "Pick a family and paste their reply" };
   const today = todayIST();
   const balance = familyStats(f, today).balance;
   const r = await parseReply(text.trim(), today, balance, f.parentName);
+  await learnFromReply(familyId, text.trim(), r.promisedDate);
   await db.agentAction.create({ data: { type: "NOTE", familyId, title: `Read reply from ${f.parentName}`, detail: text.slice(0, 200), reason: r.summary, status: "DONE", source: r.source } });
+
+  let scheduled: { promiseDate: string; amount: number; followUpDate: string; riskBefore: number | null; riskAfter: number | null } | null = null;
+  if (r.promisedDate && balance > 0) {
+    const before = (await loadDashboard()).forecast.rent?.risk ?? null;
+    const amount = Math.min(balance, Math.max(1, Math.round(r.amount ?? balance)));
+    const promisedDate = fromKey(r.promisedDate);
+    // one open promise per family: a new reply replaces the old date
+    const open = await db.payPromise.findFirst({ where: { familyId, kept: null }, orderBy: { createdAt: "desc" } });
+    if (open) await db.payPromise.update({ where: { id: open.id }, data: { promisedDate, amount, note: text.slice(0, 200), source: "MUNSHI" } });
+    else await db.payPromise.create({ data: { familyId, promisedDate, amount, note: text.slice(0, 200), source: "MUNSHI" } });
+    const followUp = addDays(promisedDate, 1);
+    await db.reminder.deleteMany({ where: { familyId, status: "SCHEDULED", note: { startsWith: "promise-follow-up" } } });
+    await db.reminder.create({ data: { familyId, tone: "GENTLE", language: f.language, status: "SCHEDULED", scheduledFor: followUp, note: `promise-follow-up ${r.promisedDate}` } });
+    await db.agentAction.create({ data: { type: "PROMISE", familyId, title: `${f.parentName} promised ${amount} on ${r.promisedDate}; follow-up nudge on ${toKey(followUp)}`, reason: r.summary, status: "DONE", source: r.source } });
+    const after = (await loadDashboard()).forecast.rent?.risk ?? null;
+    scheduled = { promiseDate: r.promisedDate, amount, followUpDate: toKey(followUp), riskBefore: before, riskAfter: after };
+  }
   refreshAll();
-  return { ok: true as const, result: r, balance };
+  return { ok: true as const, result: r, balance, scheduled };
 }
 
 export async function askMunshiAction(question: string) {
   if (!question.trim()) return { ok: false as const, error: "Ask a question" };
   const { askMunshi } = await import("@/lib/munshi/agent");
   const { loadDashboard } = await import("@/lib/board-view");
-  const { board, forecast } = await loadDashboard();
-  const r = await askMunshi(question.trim().slice(0, 500), { families: board.families, forecast, totalPending: board.totalPending, today: board.today });
+  const { getOrigin } = await import("@/lib/origin");
+  const { board, forecast, input } = await loadDashboard();
+  const r = await askMunshi(question.trim().slice(0, 500), {
+    families: board.families,
+    forecast,
+    input,
+    totalPending: board.totalPending,
+    today: board.today,
+    autonomy: board.settings.autonomy,
+    centreName: board.settings.centreName,
+    tutorName: board.settings.tutorName,
+    origin: await getOrigin(),
+  });
+  if (r.actions?.length) refreshAll();
   return { ok: true as const, ...r };
 }
 
-export async function createPlanFromSteps(input: { title: string; goal: string; steps: { type: string; familyId?: string; title: string; detail: string; reason: string; payload: Record<string, unknown> }[] }): Promise<ActionResult> {
+export async function createPlanFromSteps(input: {
+  title: string;
+  goal: string;
+  status?: "PROPOSED" | "ACTIVE";
+  gap?: number;
+  rentAmount?: number;
+  rentDate?: string;
+  steps: { type: string; familyId?: string; title: string; detail: string; reason: string; payload: Record<string, unknown> }[];
+}): Promise<ActionResult> {
   await db.agentPlan.updateMany({ where: { status: { in: ["PROPOSED", "ACTIVE"] } }, data: { status: "DISMISSED" } });
   await db.agentPlan.create({
     data: {
       title: input.title,
       goal: input.goal,
-      status: "PROPOSED",
+      status: input.status ?? "PROPOSED",
+      gap: input.gap ?? 0,
+      rentAmount: input.rentAmount ?? 0,
+      rentDate: input.rentDate ?? "",
       actions: { create: input.steps.map((s, i) => ({ type: s.type, familyId: s.familyId ?? null, title: s.title, detail: s.detail, reason: s.reason, payload: JSON.stringify(s.payload), step: i + 1 })) },
     },
   });
   refreshAll();
-  return { ok: true, message: "Plan sent to your approval inbox" };
+  return { ok: true, message: input.status === "ACTIVE" ? "Rent Defense Plan started" : "Plan sent to your approval inbox" };
+}
+
+/** Builds today's Rent Defense Plan and persists it as an ACTIVE AgentPlan whose steps each carry a family and an amount. */
+export async function startRentPlan(): Promise<ActionResult> {
+  const { loadDashboard } = await import("@/lib/board-view");
+  const { buildRentPlan } = await import("@/lib/munshi/rules");
+  const { board, forecast } = await loadDashboard();
+  const plan = buildRentPlan({ families: board.families, forecast, bills: board.bills, today: board.today });
+  if (!plan || !forecast.rent) return { ok: false, error: "No rent bill to defend. Add one in Settings." };
+  return createPlanFromSteps({
+    title: plan.title,
+    goal: plan.goal,
+    status: "ACTIVE",
+    gap: plan.gap,
+    rentAmount: forecast.rent.amount,
+    rentDate: forecast.rent.date,
+    steps: plan.steps.map((s) => ({ type: s.type, familyId: s.familyId, title: s.title, detail: s.detail, reason: s.reason, payload: { ...s.payload, amount: s.amount, billId: s.billId, collected: 0 } })),
+  });
+}
+
+export async function dismissRentPlan(): Promise<ActionResult> {
+  await db.agentPlan.updateMany({ where: { status: { in: ["PROPOSED", "ACTIVE", "DONE"] } }, data: { status: "DISMISSED" } });
+  refreshAll();
+  return { ok: true };
 }

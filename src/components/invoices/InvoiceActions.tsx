@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
-import { confirmClaim, generateMonthInvoices, rejectClaim } from "@/app/actions";
+import { confirmClaim, generateMonthInvoices, issueDrafts, rejectClaim } from "@/app/actions";
 
 export function GenerateInvoicesButton() {
   const [msg, setMsg] = useState<string | null>(null);
@@ -12,6 +12,19 @@ export function GenerateInvoicesButton() {
       {msg && <span className="font-mono text-xs text-plaster/70">{msg}</span>}
       <Button disabled={pending} onClick={() => start(async () => { const r = await generateMonthInvoices(); setMsg(r.ok ? r.message ?? "Done" : r.error); })}>
         {pending ? "Generating…" : "Generate this month"}
+      </Button>
+    </div>
+  );
+}
+
+export function IssueDraftsButton({ ids, label = "Issue all" }: { ids?: string[]; label?: string }) {
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <div className="flex items-center gap-3">
+      {msg && <span className="font-mono text-xs text-plaster/70">{msg}</span>}
+      <Button variant="lamp" disabled={pending} onClick={() => start(async () => { const r = await issueDrafts({ ids }); setMsg(r.ok ? r.message ?? "Issued" : r.error); })}>
+        {pending ? "Issuing…" : label}
       </Button>
     </div>
   );
