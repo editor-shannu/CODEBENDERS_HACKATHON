@@ -23,7 +23,7 @@ export type ForecastInput = {
 };
 
 export type WhatIf = {
-  extraDelay?: { familyId: string | "ALL"; days: number };
+  extraDelay?: { familyId: string | "ALL"; days: number; familyIds?: string[] };
   loseStudents?: { count: number; fromMonth: string };
   feeRaise?: { amount: number; fromMonth: string };
   addStudents?: { count: number; fee: number; fromMonth: string };
@@ -81,7 +81,7 @@ export function runForecast(input: ForecastInput, whatIf: WhatIf = {}, opts: { h
   };
 
   const extraFor = (fid: string) =>
-    whatIf.extraDelay && (whatIf.extraDelay.familyId === "ALL" || whatIf.extraDelay.familyId === fid) ? whatIf.extraDelay.days : 0;
+    whatIf.extraDelay && (whatIf.extraDelay.familyId === "ALL" || whatIf.extraDelay.familyId === fid || !!whatIf.extraDelay.familyIds?.includes(fid)) ? whatIf.extraDelay.days : 0;
 
   const futureMonths: string[] = [];
   for (let m = 1; m <= Math.ceil(H / 28) + 1; m++) futureMonths.push(monthKey(addMonths(monthStart(today), m)));
