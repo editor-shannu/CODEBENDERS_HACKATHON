@@ -13,7 +13,6 @@ type Habit = "ONTIME_CASH" | "SAMEDAY_UPI" | "LATE" | "CHRONIC" | "PARTIAL" | "B
 
 type Fam = {
   parent: string;
-  phone: string;
   language: "en" | "te" | "hi";
   habit: Habit;
   dueDay: number;
@@ -27,41 +26,41 @@ const B8 = "Class 8 Maths";
 const B9 = "Class 9-10 Board Prep";
 
 const FAMILIES: Fam[] = [
-  { parent: "Ramesh Naidu", phone: "+919849012345", language: "te", habit: "ONTIME_CASH", dueDay: 5, notes: "Pays cash in person, always a day or two early.", memory: { bestTime: "Morning, at drop-off", tone: "Never needed a reminder" },
+  { parent: "Ramesh Naidu", language: "te", habit: "ONTIME_CASH", dueDay: 5, notes: "Pays cash in person, always a day or two early.", memory: { bestTime: "Morning, at drop-off", tone: "Never needed a reminder" },
     kids: [ { name: "Sai Charan Naidu", batch: B9, fee: 3000 }, { name: "Harika Naidu", batch: B6, fee: 1800 } ] },
-  { parent: "Srinivasa Rao Kondapalli", phone: "+919866123456", language: "te", habit: "SAMEDAY_UPI", dueDay: 10, notes: "Pays by PhonePe on the due date.", memory: { bestTime: "Evening after 7 pm" },
+  { parent: "Srinivasa Rao Kondapalli", language: "te", habit: "SAMEDAY_UPI", dueDay: 10, notes: "Pays by PhonePe on the due date.", memory: { bestTime: "Evening after 7 pm" },
     kids: [ { name: "Pranav Kondapalli", batch: B8, fee: 2200 } ] },
-  { parent: "Venkatesh Pydi", phone: "+919959234567", language: "te", habit: "CHRONIC", dueDay: 5, notes: "Runs a tiffin centre; cash flow is uneven. Usually pays 30 to 45 days late.", memory: { bestTime: "After 9 pm, once the shop closes", tone: "Firm works better than gentle" },
+  { parent: "Venkatesh Pydi", language: "te", habit: "CHRONIC", dueDay: 5, notes: "Runs a tiffin centre; cash flow is uneven. Usually pays 30 to 45 days late.", memory: { bestTime: "After 9 pm, once the shop closes", tone: "Firm works better than gentle" },
     kids: [ { name: "Ravi Teja Pydi", batch: B9, fee: 3000 } ] },
-  { parent: "Lakshmana Rao Gedela", phone: "+919491345678", language: "te", habit: "PARTIAL", dueDay: 10, notes: "Pays in two parts: around the 15th and at month-end.", memory: { bestTime: "Sunday morning", payday: "Splits payments" },
+  { parent: "Lakshmana Rao Gedela", language: "te", habit: "PARTIAL", dueDay: 10, notes: "Pays in two parts: around the 15th and at month-end.", memory: { bestTime: "Sunday morning", payday: "Splits payments" },
     kids: [ { name: "Bhavya Gedela", batch: B6, fee: 1500 }, { name: "Bharath Gedela", batch: B8, fee: 2200 } ] },
-  { parent: "Suresh Babu Allu", phone: "+919703456789", language: "te", habit: "BREAKER", dueDay: 5, notes: "Promised twice last month and missed both dates.", memory: { bestTime: "Lunch hour, 1 to 2 pm", tone: "Gentle reminders get ignored" },
+  { parent: "Suresh Babu Allu", language: "te", habit: "BREAKER", dueDay: 5, notes: "Promised twice last month and missed both dates.", memory: { bestTime: "Lunch hour, 1 to 2 pm", tone: "Gentle reminders get ignored" },
     kids: [ { name: "Keerthi Allu", batch: B9, fee: 2800 } ] },
-  { parent: "Padma Rani Bonela", phone: "+919640567890", language: "te", habit: "BREAKER", dueDay: 10, notes: "Mother handles fees. Two missed promises in October.", memory: { bestTime: "Afternoon, 3 to 5 pm" },
+  { parent: "Padma Rani Bonela", language: "te", habit: "BREAKER", dueDay: 10, notes: "Mother handles fees. Two missed promises in October.", memory: { bestTime: "Afternoon, 3 to 5 pm" },
     kids: [ { name: "Yashwanth Bonela", batch: B8, fee: 2200 } ] },
-  { parent: "Appala Naidu Kandi", phone: "+918897678901", language: "te", habit: "PAYDAY", dueDay: 10, notes: "Father works at the jute mill; salary on the 15th, pays right after.", memory: { bestTime: "Evening", payday: "Around the 17th" },
+  { parent: "Appala Naidu Kandi", language: "te", habit: "PAYDAY", dueDay: 10, notes: "Father works at the jute mill; salary on the 15th, pays right after.", memory: { bestTime: "Evening", payday: "Around the 17th" },
     kids: [ { name: "Divya Kandi", batch: B9, fee: 3000 } ] },
-  { parent: "Raju Mandapati", phone: "+919000789012", language: "en", habit: "SAMEDAY_UPI", dueDay: 5, notes: "Prefers English messages. Pays by GPay.", memory: { bestTime: "Morning" },
+  { parent: "Raju Mandapati", language: "en", habit: "SAMEDAY_UPI", dueDay: 5, notes: "Prefers English messages. Pays by GPay.", memory: { bestTime: "Morning" },
     kids: [ { name: "Manoj Mandapati", batch: B6, fee: 1600 } ] },
-  { parent: "Sunitha Chintalapudi", phone: "+919182890123", language: "te", habit: "LATE", dueDay: 10, notes: "Pays 10 to 15 days late but always pays.", memory: { bestTime: "After 8 pm" },
+  { parent: "Sunitha Chintalapudi", language: "te", habit: "LATE", dueDay: 10, notes: "Pays 10 to 15 days late but always pays.", memory: { bestTime: "After 8 pm" },
     kids: [ { name: "Sneha Chintalapudi", batch: B9, fee: 3200 }, { name: "Sravya Chintalapudi", batch: B6, fee: 1800 } ] },
-  { parent: "Mohammed Rafi", phone: "+919394901234", language: "hi", habit: "SAMEDAY_UPI", dueDay: 10, notes: "Hindi messages. Pays by UPI the same day.", memory: { bestTime: "After Maghrib, around 6:30 pm" },
+  { parent: "Mohammed Rafi", language: "hi", habit: "SAMEDAY_UPI", dueDay: 10, notes: "Hindi messages. Pays by UPI the same day.", memory: { bestTime: "After Maghrib, around 6:30 pm" },
     kids: [ { name: "Ayaan Rafi", batch: B8, fee: 2400 }, { name: "Zoya Rafi", batch: B6, fee: 1800 } ] },
-  { parent: "Rajesh Kumar Sharma", phone: "+917702012345", language: "hi", habit: "ONTIME_CASH", dueDay: 5, notes: "Railway employee, transferred from Bhopal.", memory: { bestTime: "Weekends" },
+  { parent: "Rajesh Kumar Sharma", language: "hi", habit: "ONTIME_CASH", dueDay: 5, notes: "Railway employee, transferred from Bhopal.", memory: { bestTime: "Weekends" },
     kids: [ { name: "Aditi Sharma", batch: B9, fee: 3500 } ] },
-  { parent: "Kalyani Reddy", phone: "+919505123456", language: "en", habit: "LATE", dueDay: 15, notes: "Works shifts at the district hospital.", memory: { bestTime: "Late morning" },
+  { parent: "Kalyani Reddy", language: "en", habit: "LATE", dueDay: 15, notes: "Works shifts at the district hospital.", memory: { bestTime: "Late morning" },
     kids: [ { name: "Tanvi Reddy", batch: B8, fee: 2200 }, { name: "Tarun Reddy", batch: B6, fee: 1600 } ] },
-  { parent: "Ganesh Patnaik", phone: "+918008234567", language: "te", habit: "SAMEDAY_UPI", dueDay: 10, notes: "", memory: {},
+  { parent: "Ganesh Patnaik", language: "te", habit: "SAMEDAY_UPI", dueDay: 10, notes: "", memory: {},
     kids: [ { name: "Lohith Patnaik", batch: B6, fee: 1500 } ] },
-  { parent: "Durga Prasad Yalla", phone: "+919849345678", language: "te", habit: "LATE", dueDay: 5, notes: "Farmer; pays after market days.", memory: { bestTime: "Early morning" },
+  { parent: "Durga Prasad Yalla", language: "te", habit: "LATE", dueDay: 5, notes: "Farmer; pays after market days.", memory: { bestTime: "Early morning" },
     kids: [ { name: "Hemanth Yalla", batch: B9, fee: 3000 } ] },
-  { parent: "Satyanarayana Murthy", phone: "+919866456789", language: "te", habit: "ONTIME_CASH", dueDay: 5, notes: "Retired teacher. Never late.", memory: { bestTime: "Any time" },
+  { parent: "Satyanarayana Murthy", language: "te", habit: "ONTIME_CASH", dueDay: 5, notes: "Retired teacher. Never late.", memory: { bestTime: "Any time" },
     kids: [ { name: "Jahnavi Murthy", batch: B9, fee: 3200 }, { name: "Karthik Murthy", batch: B8, fee: 2400 } ] },
-  { parent: "Anitha Vasupalli", phone: "+919959567890", language: "te", habit: "PROMISE", dueDay: 15, notes: "Said she will pay in two days.", memory: { bestTime: "After 6 pm" },
+  { parent: "Anitha Vasupalli", language: "te", habit: "PROMISE", dueDay: 15, notes: "Said she will pay in two days.", memory: { bestTime: "After 6 pm" },
     kids: [ { name: "Rishi Vasupalli", batch: B6, fee: 1800 } ] },
-  { parent: "Krishna Mohan Pilla", phone: "+919490678901", language: "en", habit: "SAMEDAY_UPI", dueDay: 10, notes: "", memory: {},
+  { parent: "Krishna Mohan Pilla", language: "en", habit: "SAMEDAY_UPI", dueDay: 10, notes: "", memory: {},
     kids: [ { name: "Varun Pilla", batch: B9, fee: 3000 }, { name: "Varsha Pilla", batch: B6, fee: 1800 } ] },
-  { parent: "Nagamani Boddu", phone: "+919703789012", language: "te", habit: "LEFT", dueDay: 10, notes: "Chaitanya left mid-term in October (moved to Visakhapatnam). October fee still pending.", memory: { bestTime: "Evening" },
+  { parent: "Nagamani Boddu", language: "te", habit: "LEFT", dueDay: 10, notes: "Chaitanya left mid-term in October (moved to Visakhapatnam). October fee still pending.", memory: { bestTime: "Evening" },
     kids: [ { name: "Chaitanya Boddu", batch: B8, fee: 2200, active: false } ] },
 ];
 
@@ -142,7 +141,6 @@ export async function seedDemo(db: PrismaClient, now: Date = new Date()) {
     const family = await db.family.create({
       data: {
         parentName: f.parent,
-        phone: f.phone,
         language: f.language,
         notes: f.notes,
         memory: JSON.stringify(f.memory),

@@ -16,7 +16,11 @@ Millions of home tutors in India collect fees in cash and UPI, track them in a n
 - **Chase Queue**: swipe right to remind, left to snooze. Families are ranked by a chase score built from amount, lateness, broken promises and reminder history.
 - **Tone Dial reminders**: Gentle, Firm or Final WhatsApp messages in **Telugu, Hindi or English**, matched to each family's language, with a UPI pay link inside.
 - **Cash-flow forecast**: a cone chart of likely collections against upcoming bills such as rent, with festival and exam seasons slowing collections.
-- **Munshi brief**: a rules-based clerk that suggests the day's actions (who to chase, early-pay discounts, bills to defer), designed to grow into an LLM agent.
+- **Munshi**: a clerk with a daily brief, a Rent Defense Plan, an approval inbox, a Reply Reader that turns "sir next week pakka istanu" into a dated promise, and Ask Munshi (an AI agent loop with tool calls and a visible trace). With no `LLM_API_KEY` it runs on offline rules, so the demo never breaks.
+- **Forecast**: a 500-run Monte Carlo cash cone, rent risk, runway, money weather, and Time Machine sliders (late payers, dropouts, fee raise, new admissions).
+- **Invoices**: monthly generation with sibling discount, UPI QR, Download PDF (print), and a public Parent Pay Link with an "I've paid" button the tutor confirms in one tap.
+- **Students, families, settings**: add or edit students, siblings, bills, festival and exam dates, the Munshi autonomy dial, and a one-tap demo reset.
+- **Privacy**: Baaki stores no parent phone numbers. Reminders open WhatsApp with the message ready, and the tutor picks the chat.
 - **Sibling discount**: 10% off the second and later child, applied automatically to invoices.
 
 ## Tech stack
@@ -82,7 +86,7 @@ docs/SPEC.md     product spec and build order
 
 ## Roadmap
 
-Students, families, invoices and settings pages · UPI QR codes · parent pay link · invoice PDF and PWA · Munshi as a full LLM agent with ask-before-acting autonomy.
+WhatsApp Business API sending · tests for the forecast and date engine · multi-tutor accounts.
 
 ## Team
 

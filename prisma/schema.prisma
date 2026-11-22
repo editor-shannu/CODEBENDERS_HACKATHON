@@ -23,7 +23,7 @@ model Settings {
 model Family {
   id         String      @id @default(cuid())
   parentName String
-  phone      String
+  phone      String      @default("") // unused: Baaki never stores parent phone numbers
   language   String      @default("te") // en | te | hi
   notes      String      @default("")
   memory     String      @default("{}") // Munshi's learned notes (JSON)

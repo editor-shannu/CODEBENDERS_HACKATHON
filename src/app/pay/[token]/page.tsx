@@ -1,0 +1,67 @@
+import QRCode from "qrcode";
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { Eyebrow } from "@/components/ui/Card";
+import { Stamp } from "@/components/ui/Stamp";
+import { Guard } from "@/components/setup/Guard";
+import { PayClaim } from "@/components/invoices/PayClaim";
+import { db } from "@/lib/db";
+import { getSettings } from "@/lib/data";
+import { balanceOf } from "@/lib/invoice-status";
+import { formatDate, formatMonth } from "@/lib/dates";
+import { formatINR } from "@/lib/money";
+import { upiLink } from "@/lib/upi";
+
+export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Pay tuition fee", robots: { index: false } };
+
+export default async function PayPage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
+  return (
+    <Guard>
+      {async () => {
+        const inv = await db.invoice.findUnique({ where: { payToken: token }, include: { family: { include: { students: true } }, payments: true, claims: { where: { status: "PENDING" } } } });
+        if (!inv) notFound();
+        const settings = await getSettings();
+        const bal = balanceOf(inv);
+        const kids = inv.family.students.filter(() => true).map((s) => s.name.split(" ")[0]).join(", ");
+        const upi = upiLink({ vpa: settings.upiId, name: settings.upiName, amount: bal, note: `${inv.number} ${kids}` });
+        const qr = bal > 0 ? await QRCode.toDataURL(upi, { margin: 1, width: 260, color: { dark: "#0E0E0E", light: "#F3EAD7" } }) : null;
+        return (
+          <div className="mx-auto max-w-md">
+            <p className="mb-4 text-center font-display text-2xl italic text-turmeric">{settings.centreName}</p>
+            <div className="ruled-paper relative border border-ink/15 p-6 text-ink">
+              <Eyebrow>Tuition fee · {formatMonth(inv.month, false)}</Eyebrow>
+              <h1 className="mt-1 font-display text-3xl leading-tight">Namaste {inv.family.parentName.split(" ")[0]} garu</h1>
+              <p className="text-sm text-ink/70">for {kids}</p>
+              {bal === 0 ? (
+                <div className="my-8 text-center">
+                  <Stamp kind="PAID" className="text-3xl" />
+                  <p className="mt-4 font-mono text-sm">Fully paid. Thank you!</p>
+                </div>
+              ) : (
+                <>
+                  <p className="big-number mt-4 text-5xl text-khata">{formatINR(bal)}</p>
+                  <p className="font-mono text-xs text-ink/60">Due {formatDate(inv.dueDate)} · {inv.number}</p>
+                  {qr && (
+                    <div className="my-5 flex flex-col items-center">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={qr} alt="UPI QR code" width={200} height={200} className="border border-ink/20" />
+                      <p className="mt-2 font-mono text-xs">{settings.upiName} · {settings.upiId}</p>
+                    </div>
+                  )}
+                  {inv.claims.length > 0 ? (
+                    <p className="border border-turmeric p-3 text-center font-mono text-sm">We got your payment note. {settings.tutorName.split(" ")[0]} garu will confirm soon.</p>
+                  ) : (
+                    <PayClaim token={token} balance={bal} upi={upi} />
+                  )}
+                </>
+              )}
+            </div>
+            <p className="mt-4 text-center font-mono text-[11px] text-ledger/50">Payments go directly to {settings.tutorName}&apos;s UPI. Baaki never handles your money.</p>
+          </div>
+        );
+      }}
+    </Guard>
+  );
+}

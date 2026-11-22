@@ -6,13 +6,6 @@ export const MODES = ["CASH", "UPI"] as const;
 export const TONES = ["GENTLE", "FIRM", "FINAL"] as const;
 export const AUTONOMY = ["SUGGEST", "ASK", "AUTO"] as const;
 
-export const phoneSchema = z
-  .string()
-  .trim()
-  .transform((s) => s.replace(/[\s-]/g, ""))
-  .refine((s) => /^(\+91)?[6-9]\d{9}$/.test(s), "Enter a 10-digit Indian mobile number")
-  .transform((s) => (s.startsWith("+91") ? s : `+91${s}`));
-
 export const studentSchema = z.object({
   name: z.string().trim().min(2, "Name is too short"),
   batch: z.enum(BATCHES),
@@ -20,7 +13,6 @@ export const studentSchema = z.object({
   dueDay: z.coerce.number().int().min(1).max(28),
   familyId: z.string().optional(),
   parentName: z.string().trim().optional(),
-  phone: z.string().optional(),
   language: z.enum(LANGUAGES).optional(),
 });
 
