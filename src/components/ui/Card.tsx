@@ -12,9 +12,9 @@ type Props = {
 export function Card({ children, className = "", variant = "ledger", ruled = true, as: Tag = "div" }: Props) {
   const base =
     variant === "ledger"
-      ? `${ruled ? "bg-plaster" : "bg-plaster pl-5"} text-dusk-deep border border-dusk-deep/15`
+      ? `${ruled ? "ruled-paper" : "bg-plaster pl-5"} text-dusk-deep border border-dusk-deep/15`
       : variant === "khata"
-        ? "bg-slate-mute text-dusk-deep border border-slate-mute"
+        ? "bg-brick text-plaster border border-brick"
         : variant === "turmeric"
           ? "bg-lamp text-dusk-deep border border-lamp"
           : "bg-dusk-deep text-plaster border border-plaster/20";
