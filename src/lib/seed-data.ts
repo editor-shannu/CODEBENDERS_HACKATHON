@@ -96,6 +96,7 @@ export async function seedDemo(db: PrismaClient, now: Date = new Date()) {
       upiName: "Lakshmi Teaching Point",
       startingBalance: 10500,
       autonomy: "ASK",
+      monthlyGoal: 60000,
     },
   });
 

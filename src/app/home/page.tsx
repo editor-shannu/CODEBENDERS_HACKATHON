@@ -8,7 +8,8 @@ import { BriefActions } from "@/components/munshi/BriefActions";
 import { loadDashboard } from "@/lib/board-view";
 import { dbHealth } from "@/lib/db-health";
 import { SetupNotice } from "@/components/setup/SetupNotice";
-import { formatDate, fromKey, daysBetween, toKey } from "@/lib/dates";
+import { formatDate, formatMonth, fromKey, daysBetween, monthKey, toKey } from "@/lib/dates";
+import { goalSuggestion } from "@/lib/munshi/rules";
 import { formatINR } from "@/lib/money";
 import { HouseStatus, houseStatusOf } from "@/components/ui/HouseStatus";
 
@@ -181,6 +182,21 @@ export default async function HomePage() {
           </Card>
         </Link>
       </div>
+      {settings.monthlyGoal > 0 && (() => {
+        const collected = families.reduce((s, f) => s + f.invoices.reduce((a, i) => a + i.payments.filter((p) => monthKey(p.date) === monthKey(today)).reduce((b, p) => b + p.amount, 0), 0), 0);
+        const pct = Math.min(100, Math.round((collected / settings.monthlyGoal) * 100));
+        const tip = goalSuggestion({ families, forecast, gap: settings.monthlyGoal - collected });
+        return (
+          <Link href="/owes" className="mt-4 block">
+            <Card>
+              <Eyebrow>Goal Mode · {formatMonth(monthKey(today), false)}</Eyebrow>
+              <p className="mt-1 font-mono text-sm"><MoneyText amount={collected} /> of <MoneyText amount={settings.monthlyGoal} /> collected · {pct}%</p>
+              <div className="mt-2 h-2 w-full bg-dusk-deep/10"><div className="h-2 bg-lamp" style={{ width: `${pct}%` }} /></div>
+              <p className="mt-2 text-sm">Munshi: {tip.text}</p>
+            </Card>
+          </Link>
+        );
+      })()}
       <p className="mt-4 text-center font-mono text-[11px] text-slate-mute">As of {formatDate(today)} · {toKey(today)} IST</p>
     </div>
   );

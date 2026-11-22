@@ -6,7 +6,7 @@ import { Button, inputClass, labelClass } from "@/components/ui/Button";
 import { deleteBill, deleteKeyDate, resetDemo, saveBill, saveKeyDate, saveSettings } from "@/app/actions";
 import { formatINR } from "@/lib/money";
 
-type S = { tutorName: string; centreName: string; upiId: string; upiName: string; startingBalance: number; autonomy: string };
+type S = { tutorName: string; centreName: string; upiId: string; upiName: string; startingBalance: number; autonomy: string; monthlyGoal: number };
 
 const AUTONOMY = [
   { id: "SUGGEST", label: "Suggest", hint: "Munshi only suggests" },
@@ -32,6 +32,7 @@ export function SettingsForm({ s }: { s: S }) {
         {field("upiId", "UPI ID")}
         {field("upiName", "UPI display name")}
         {field("startingBalance", "Cash in hand today (₹)", true)}
+        {field("monthlyGoal", "Monthly collection goal (₹, 0 = off)", true)}
       </div>
       <div>
         <p className={labelClass}>Munshi autonomy</p>
@@ -45,7 +46,7 @@ export function SettingsForm({ s }: { s: S }) {
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <Button disabled={pending} onClick={() => start(async () => { const r = await saveSettings({ ...v, startingBalance: Number(v.startingBalance) || 0 }); setMsg(r.ok ? r.message ?? "Saved" : r.error); })}>Save settings</Button>
+        <Button disabled={pending} onClick={() => start(async () => { const r = await saveSettings({ ...v, startingBalance: Number(v.startingBalance) || 0, monthlyGoal: Number(v.monthlyGoal) || 0 }); setMsg(r.ok ? r.message ?? "Saved" : r.error); })}>Save settings</Button>
         {msg && <span className="font-mono text-xs">{msg}</span>}
       </div>
     </div>
