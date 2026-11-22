@@ -74,7 +74,8 @@ If `DATABASE_URL` is missing or wrong, the app shows a setup screen explaining w
 prisma/          schema and seed script
 src/app/         pages (/, /owes) and server actions
 src/components/  UI primitives, Chase Queue, forecast, reminders
-src/lib/         IST date engine, invoice status, forecast, messages, UPI links, Munshi rules
+src/lib/         IST date engine, invoice status, forecast, messages, UPI links
+src/lib/munshi/  agent (tools + LLM loop), rules fallback, execute (approval + autonomy), guardrails, memory, plan
 docs/SPEC.md     product spec and build order
 ```
 
@@ -120,6 +121,71 @@ textures re-encoded to WebP):
 - Texture: [Painted Plaster Wall](https://polyhaven.com/a/painted_plaster_wall) by Amal Kumar
 - Texture: [Clay Roof Tiles 02](https://polyhaven.com/a/clay_roof_tiles_02) by Amal Kumar
 - Texture: [Dirt](https://polyhaven.com/a/dirt) by Charlotte Baglioni
+
+## Prompts and iterations
+
+### Setup in four steps
+
+1. **Database**: create a free Postgres on [Neon](https://neon.tech) and copy the pooled connection string (ends in `?sslmode=require`) into `DATABASE_URL` in `.env` (locally) or in Vercel's Environment Variables.
+2. **AI (optional)**: set `LLM_API_KEY` for any OpenAI-compatible endpoint. Gemini is the default (`LLM_BASE_URL` = Gemini's OpenAI endpoint, `LLM_MODEL` = `gemini-2.5-flash`). Without a key every Munshi feature runs on offline rules.
+3. **Migrate and seed**: `npm run db:push` creates the tables, `npm run db:seed` loads Lakshmi Teaching Point dated from today (the app also seeds itself on first visit, and Settings has a one-tap demo reset).
+4. **Run**: `npm run dev`. There is no login: the demo opens straight on the tutor's dashboard, and parents open their own pay link.
+
+### Munshi's system prompt
+
+Built in `munshiSystemPrompt()` in `src/lib/munshi/agent.ts`:
+
+> You are Munshi, the back-office clerk for {centre}, a home tuition centre in Hyderabad, India. Today is {date} (IST). Use the tools to look up real numbers before answering. Every amount and date you state must come from a tool result in this conversation; never invent or estimate one. Answer in 1 to 3 short sentences, amounts in rupees with Indian grouping (₹14,500). Be practical and kind about parents. Never threaten, shame, or pressure a family, and never suggest stopping a child's classes as a punishment. Never share one family's fees, promises or notes in a message meant for another family. Reminders are drafts in the family's own language (te, hi or en); you never send them. The tutor sends from WhatsApp. The autonomy dial is {mode}. Write tools may land in the approval inbox; say so when they do. Money actions (payments, invoices, due dates) always wait for the tutor.
+
+The Reply Reader uses a second, JSON-only prompt: read a parent's WhatsApp reply (English, Telugu, Hindi, Tenglish or Hinglish), only report a date or amount the parent actually said, and return `{promisedDate, amount, confidence, summary}`.
+
+### Tools
+
+| Tool | Kind | What it does |
+| --- | --- | --- |
+| `list_owing_families` | read | Families who owe, ranked by chase score |
+| `get_totals` | read | Total pending and counts (answer shows an owed-by-family bar chart) |
+| `get_rent_risk` | read | Chance of being short on rent day, runway, from the 500-run forecast |
+| `get_family` | read | One family's balance, lateness, promises and learned memory |
+| `run_what_if` | read | Re-runs the forecast with extra delay, dropouts, a fee raise or new admissions (answer shows a before vs after cash line) |
+| `draft_reminder` | write (low risk) | WhatsApp draft in the family's language with the real amount; never sends |
+| `schedule_nudge` | write (low risk) | Schedules a reminder nudge for a date |
+| `record_promise` | write (low risk) | Saves a family's promise to pay |
+| `flag_risk` | write (low risk) | Flags a family as a collection risk |
+| `log_payment` | write (money) | Proposes recording a payment; always needs approval |
+| `propose_due_date_change` | write (money) | Proposes a new monthly due day; always needs approval |
+| `create_invoice` | write (money) | Proposes a DRAFT invoice; always needs approval |
+
+Every write goes through `proposeOrRun()` in `src/lib/munshi/execute.ts`. With the autonomy dial on **Ask** (default) or **Suggest**, it lands in the approval inbox and runs when the tutor taps Approve. On **Auto**, low-risk writes (gentle drafts, nudges, promises, flags) run at once and are logged; money writes still wait. Without `LLM_API_KEY`, the offline rules map the question to the same tools by keywords ("what if everyone pays 10 days late", "draft a firm message for Suresh", "Padma promised Friday", "Anitha paid 1000 by UPI").
+
+### Guardrails
+
+- The system prompt above forbids threats, shaming, invented numbers and cross-family details.
+- Code check: any rupee amount in a drafted reminder must match a database value for that family (balance, an unpaid invoice, monthly fee, open promise), else it is dropped (`checkAmounts` in `src/lib/munshi/guardrails.ts`). AI answers keep only amounts that appeared in tool results, and an answer with threatening words is replaced by the offline answer.
+- WhatsApp links are always `https://wa.me/?text=...` with no phone number. Baaki stores no parent phone numbers.
+- A pay page reads one invoice by its token and only that family's name and active children; draft invoices have no working pay link.
+
+### Key build prompts, per feature
+
+- **Chase Queue mark paid**: "A Mark paid button on the top card opens the existing RecordPayment sheet prefilled with the due amount; on success show the PAID stamp and advance the queue."
+- **Approve all**: "One server action that approves every pending brief action, logs each to AgentAction, returns a count."
+- **Rent Defense progress**: "Persist the plan as AgentPlan with steps, each with a family and amount. When a payment or confirmed claim lands, mark matching steps done and update covered vs rent gap."
+- **Munshi tools**: "From 4 to 12 tools; write tools create a pending AgentAction unless autonomy allows; mirror each in the rules fallback with keyword matching."
+- **Ask Munshi charts**: "When an answer used run_what_if or get_totals, return structured data and render a small recharts chart. Keep the tool trace."
+- **Autonomy dial**: "Ask sends everything to the approval inbox. Auto runs low-risk actions immediately; money actions always need approval."
+- **Guardrails**: "No threats or shaming, no invented amounts or dates, no cross-family data; any amount in a drafted message must match a DB value."
+- **Family memory**: "Update memory after payments, promises and Reply Reader results; feed it into Payday Sync and reminder timing; expose getHouseStatus(familyId)."
+- **Reply Reader follow-ups**: "If a reply has a promise, create the PayPromise and a follow-up reminder for the day after, refresh the forecast, show what was scheduled."
+- **Draft invoices**: "Monthly generation creates DRAFT invoices; Drafts filter and Issue all; pay links only work for issued invoices."
+
+### What changed between iterations
+
+1. **v1, the notebook**: who-owes board, students and families with sibling billing, invoices and payments, all dates computed live in IST.
+2. **v2, the clerk**: Munshi as offline rules (Morning Brief with a Why for each item, Reply Reader, Payday Sync), then an LLM agent loop with four read tools and a visible trace, falling back to rules when the key is missing or the call fails.
+3. **v3, the forecast**: 500-run seeded Monte Carlo cash cone, rent risk, money weather, runway and Time Machine sliders; the Rent Defense Plan built from it.
+4. **v4, parents**: public pay link with UPI QR and an "I've paid" claim the tutor confirms; WhatsApp reminders switched to `wa.me/?text=` with no phone numbers anywhere.
+5. **v5, the look**: Old City palette, HouseStatus windows (lit = paid) and the 3D Hyderabad lane landing (built in parallel on `feat/ui-3d`).
+6. **v6, Munshi acts** (this round): 12 tools with an approval inbox that actually executes, a working autonomy dial, guardrails in prompt and code, family memory that learns, Reply Reader follow-ups, a tracked Rent Defense Plan, charts in Ask Munshi, Chase Queue mark paid, Approve all and draft invoices.
 
 ## Design decisions
 
