@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { seatError } from "@/lib/billing/seats";
 import { db } from "@/lib/db";
 import { rawDb } from "@/lib/prisma";
 import { centreForCode, joinSchema, parseKids } from "@/lib/join";
@@ -30,6 +31,8 @@ export async function approveJoinRequest(input: { id: string; fees: number[]; du
   if (!Number.isFinite(dueDay) || dueDay < 1 || dueDay > 28) return { ok: false, error: "Due day must be 1 to 28" };
   const fees = kids.map((_, i) => Math.round(Number(input.fees[i])));
   if (fees.some((f) => !Number.isFinite(f) || f < 100 || f > 50000)) return { ok: false, error: "Enter a fee of ₹100 or more for each child" };
+  const seat = await seatError(req.userId, kids.length);
+  if (seat) return { ok: false, error: seat };
   const fam = await db.family.create({ data: { parentName: req.parentName, language: req.language, notes: req.note ? `Joined by link: ${req.note}` : "Joined by link" } });
   for (let i = 0; i < kids.length; i++) {
     const batch = (input.batches?.[i] || kids[i].batch).slice(0, 40);

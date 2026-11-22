@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { currentUserId } from "@/lib/auth/session";
+import { seatError } from "@/lib/billing/seats";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { fromKey, monthKey, todayIST, toKey, addMonths, monthStart } from "@/lib/dates";
@@ -94,6 +96,8 @@ export async function importChatAction(rows: unknown[]): Promise<{ ok: true; fam
     const p = parsed[bad];
     return { ok: false, error: `Row ${bad + 1}: ${!p.success ? p.error.issues[0]?.message : ""}` };
   }
+  const seat = await seatError(await currentUserId(), parsed.reduce((n, p) => n + (p.success ? p.data.kids.length : 0), 0));
+  if (seat) return { ok: false, error: seat };
   const today = todayIST();
   const oldest = monthKey(addMonths(monthStart(today), -2));
   const thisMonth = monthKey(today);
