@@ -92,6 +92,18 @@ export function whatIfSentence(r: { scenarioLabel?: string | null; dropBy: strin
 }
 
 /** AI only with a key and when MUNSHI_FORCE_RULES is not "1"; otherwise every answer comes from the offline rules. */
+/** Code-built answers so amounts, names and approval state never depend on the model's wording. */
+export function owesMostSentence(families: { parentName: string; stats: { balance: number; oldestDaysLate: number } }[]): string {
+  const top = families.filter((f) => f.stats.balance > 0).sort((a, b) => b.stats.balance - a.stats.balance);
+  if (!top.length) return "Nobody owes anything right now.";
+  const next = top.slice(1, 3).map((x) => `${x.parentName} (${formatINR(x.stats.balance)})`).join(", ");
+  return `${top[0].parentName} owes the most: ${formatINR(top[0].stats.balance)}, ${top[0].stats.oldestDaysLate} days late.${next ? ` Next: ${next}.` : ""}`;
+}
+export const OWES_MOST = /owes? (the )?most|biggest (balance|due|dues)|highest (balance|due)|most (pending|money)/i;
+export function remindAllSentence(r: { drafted: number; families: { parent: string; owes: number; daysLate: number; tone: string }[] }): string {
+  return r.drafted ? `${r.drafted} reminders are ready, each in the family's own language with their pay link: ${r.families.map((x) => `${x.parent} ${formatINR(x.owes)}, ${x.daysLate}d late (${x.tone.toLowerCase()})`).join("; ")}. Tap a name to send it on WhatsApp.` : "Nobody is late right now.";
+}
+
 export const llmEnabled = () => Boolean(process.env.LLM_API_KEY) && process.env.MUNSHI_FORCE_RULES !== "1";
 
 export type Msg = { role: "system" | "user" | "assistant" | "tool"; content: string | null; tool_calls?: ToolCall[]; tool_call_id?: string };
@@ -327,7 +339,10 @@ async function runTool(name: string, args: Record<string, unknown>, ctx: Ctx, so
       return { result: { flagged: true, reason, ...r }, action: { title: `Flagged ${f.parentName}`, status: r.status } };
     }
     case "remind_all_late": {
-      const tone = ["GENTLE", "FIRM", "FINAL"].includes(String(args.tone)) ? (String(args.tone) as Tone) : null;
+      // Each family gets its own tone (gentle first nudge, firm or final for long delays or broken promises)
+      // unless the tutor's own words asked for one tone.
+      const asked = !ctx.question || /\b(gentle|soft|polite|firm|strict|final|last)\b/i.test(ctx.question);
+      const tone = asked && ["GENTLE", "FIRM", "FINAL"].includes(String(args.tone)) ? (String(args.tone) as Tone) : null;
       const late = [...owing].filter((f) => f.stats.oldestDaysLate > 0).sort((a, b) => b.stats.chaseScore - a.stats.chaseScore).slice(0, Math.min(10, Number(args.limit ?? 8)));
       const links: ChatLink[] = [];
       const out = late.map((f) => {
@@ -428,12 +443,10 @@ async function rulesAnswer(q: string, ctx: Ctx): Promise<AskResult> {
     }
   } else if (lateWords) {
     const r = (await call("remind_all_late", tone ? { tone } : {})) as { drafted: number; families: { parent: string; owes: number; daysLate: number }[] };
-    const r2 = r as unknown as { families: { parent: string; owes: number; daysLate: number; tone: string }[] };
-    answer = r.drafted ? `${r.drafted} reminders are ready, each in the family's own language with their pay link: ${r2.families.map((x) => `${x.parent} ${formatINR(x.owes)}, ${x.daysLate}d late (${x.tone.toLowerCase()})`).join("; ")}. Tap a name to send it on WhatsApp.` : "Nobody is late right now.";
-  } else if (/owes? (the )?most|biggest (balance|due|dues)|highest (balance|due)|most (pending|money)/.test(s)) {
-    const r = (await call("list_owing_families", { limit: 20 })) as { parent: string; owes: number; daysLate: number }[];
-    const top = [...r].sort((a, b) => b.owes - a.owes);
-    answer = top.length ? `${top[0].parent} owes the most: ${formatINR(top[0].owes)}, ${top[0].daysLate} days late.${top[1] ? ` Next: ${top.slice(1, 3).map((x) => `${x.parent} (${formatINR(x.owes)})`).join(", ")}.` : ""}` : "Nobody owes anything right now.";
+    answer = remindAllSentence(r as Parameters<typeof remindAllSentence>[0]);
+  } else if (OWES_MOST.test(s)) {
+    await call("list_owing_families", { limit: 20 });
+    answer = owesMostSentence(ctx.families);
   } else if (whoOwes) {
     const r = (await call("remind_all_late", {})) as { drafted: number; families: { parent: string; owes: number; daysLate: number }[] };
     const tot = ctx.totalPending;
@@ -509,6 +522,7 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
   const links: ChatLink[] = [];
   const results: unknown[] = [];
   const whatIfs: Parameters<typeof whatIfSentence>[0][] = [];
+  const byTool: Record<string, unknown> = {};
   const deadline = Date.now() + 5_000; // over 5 s in the model: fall back to the offline rules
   const messages: Msg[] = [
     { role: "system", content: munshiSystemPrompt(ctx) },
@@ -529,6 +543,7 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
           if (out.links) links.push(...out.links);
           trace.push({ kind: "result", text: JSON.stringify(out.result).slice(0, 300) });
           results.push(out.result);
+          byTool[tc.function.name] = out.result;
           if (tc.function.name === "run_what_if") whatIfs.push(out.result as Parameters<typeof whatIfSentence>[0]);
           messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(out.result) });
         }
@@ -545,6 +560,11 @@ export async function askMunshi(question: string, ctx: Ctx): Promise<AskResult> 
         const advice = answer.split(/(?<=[.!?])\s+/).filter((x) => x && !/[₹%\d]/.test(x)).slice(0, 1).join(" ");
         answer = [whatIfSentence(whatIfs[whatIfs.length - 1]), advice].filter(Boolean).join(" ");
       }
+      if (byTool.remind_all_late) answer = remindAllSentence(byTool.remind_all_late as Parameters<typeof remindAllSentence>[0]);
+      if (OWES_MOST.test(question)) answer = owesMostSentence(ctx.families);
+      const pay = byTool.log_payment as { amount?: number; mode?: string; status?: string; balanceNow?: number; balanceAfter?: number } | undefined;
+      const payFam = findFamily(ctx, actions.find((a) => / from /.test(a.title))?.title.split(" from ")[1]);
+      if (pay?.amount && pay.status !== "done") answer = `Record ${formatINR(pay.amount)} ${pay.mode === "UPI" ? "UPI" : "cash"}${payFam ? ` from ${payFam.parentName}` : ""}? Tap Approve and ${payFam ? payFam.parentName.split(" ")[0] : "they"} will owe ${formatINR(Math.max(0, pay.balanceAfter ?? 0))} (now ${formatINR(pay.balanceNow ?? 0)}).`;
       if (isThreatening(answer)) {
         trace.push({ kind: "think", text: "Guardrail: the AI answer used threatening or shaming words, switched to offline rules." });
         if (!actions.length) {

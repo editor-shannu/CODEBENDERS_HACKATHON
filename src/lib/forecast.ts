@@ -46,7 +46,11 @@ const quantile = (sorted: number[], q: number) => sorted[Math.min(sorted.length 
 export function runForecast(input: ForecastInput, whatIf: WhatIf = {}, opts: { horizon?: number; runs?: number; seed?: number } = {}): ForecastResult {
   const H = opts.horizon ?? 90;
   const RUNS = opts.runs ?? 500;
-  const rand = mulberry32(opts.seed ?? 20261121);
+  const seed0 = opts.seed ?? 20261121;
+  // Common random numbers: each family gets its own stream per run, so a what-if on one family
+  // never reshuffles the draws of the others (before vs after compares like with like).
+  const hashStr = (str: string) => { let h = 2166136261; for (let k = 0; k < str.length; k++) h = Math.imul(h ^ str.charCodeAt(k), 16777619); return h >>> 0; };
+  let rand = mulberry32(seed0);
   const today = fromKey(input.today);
   const dayIdx = (d: Date) => daysBetween(today, d);
 
@@ -97,6 +101,7 @@ export function runForecast(input: ForecastInput, whatIf: WhatIf = {}, opts: { h
     };
 
     for (const f of input.families) {
+      rand = mulberry32((seed0 ^ hashStr(f.id)) + r * 7919);
       const extra = extraFor(f.id);
       const sampleDelay = () => {
         const base = f.delays.length ? f.delays[Math.floor(rand() * f.delays.length)] : 7;
@@ -133,6 +138,7 @@ export function runForecast(input: ForecastInput, whatIf: WhatIf = {}, opts: { h
     }
 
     // Whole-centre scenarios
+    rand = mulberry32(seed0 + r * 104729 + 1);
     for (const month of futureMonths) {
       const i = dayIdx(dateInMonth(month, 10));
       if (whatIf.loseStudents && month >= whatIf.loseStudents.fromMonth && i >= 0 && i <= H) {
