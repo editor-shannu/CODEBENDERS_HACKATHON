@@ -77,6 +77,7 @@ export async function seedDemo(userId: string, now: Date = new Date()) {
   const cap = (d: Date) => (d >= today ? addDays(today, -1) : d);
 
   await db.$transaction([
+    db.joinRequest.deleteMany({ where: own }),
     db.agentAction.deleteMany({ where: own }),
     db.agentPlan.deleteMany({ where: own }),
     db.paymentClaim.deleteMany({ where: own }),
@@ -258,6 +259,14 @@ export async function seedDemo(userId: string, now: Date = new Date()) {
       });
     }
   }
+
+  // Two parents who joined through the link and wait for the tutor's approval (synthetic)
+  await db.joinRequest.createMany({
+    data: [
+      { userId, parentName: "Bhaskar Rao Tentu", language: "te", kids: JSON.stringify([{ name: "Likhitha Tentu", batch: B8 }]), note: "Joined from the parents' WhatsApp group", createdAt: addDays(now, -1) },
+      { userId, parentName: "Farhana Begum", language: "hi", kids: JSON.stringify([{ name: "Arif Shaik", batch: B6 }, { name: "Sana Shaik", batch: B9 }]), note: "", createdAt: now },
+    ],
+  });
 
   return { today: fromKey(today.toISOString()), families: FAMILIES.length };
 }

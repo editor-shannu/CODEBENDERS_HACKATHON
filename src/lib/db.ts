@@ -11,7 +11,7 @@ import { currentUserId } from "./auth/session";
  */
 
 const TENANT_MODELS = new Set([
-  "Settings", "Family", "Student", "Invoice", "Payment", "PaymentClaim", "PayPromise", "Reminder", "Bill", "KeyDate", "AgentPlan", "AgentAction",
+  "Settings", "Family", "Student", "Invoice", "Payment", "PaymentClaim", "PayPromise", "Reminder", "Bill", "KeyDate", "AgentPlan", "AgentAction", "JoinRequest",
 ]);
 
 const FOREIGN_KEYS: Record<string, "family" | "invoice" | "agentPlan"> = { familyId: "family", invoiceId: "invoice", planId: "agentPlan" };
