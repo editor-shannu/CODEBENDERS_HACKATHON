@@ -392,3 +392,16 @@ export async function matchUpiSmsAction(text: string) {
   const already = parsed.utr ? await db.payment.findFirst({ where: { reference: parsed.utr } }) : null;
   return { ok: true as const, parsed, matches: matchInvoices(parsed, open), duplicate: !!already, today: toKey(today) };
 }
+
+/* ---------- Voice Khata ---------- */
+export async function voiceKhataAction(text: string) {
+  const { parseKhata } = await import("@/lib/voice-khata");
+  const note = parseKhata(text.slice(0, 300));
+  if (!note.name) return { ok: false as const, error: "Say who paid, like \"Ravi paid 1500 cash\"" };
+  const q = note.name.split(" ")[0];
+  const families = await db.family.findMany({ include: { students: true, invoices: { where: { status: { not: "DRAFT" } }, include: { payments: true } } } });
+  const fam = families.find((f) => f.parentName.toLowerCase().split(" ").some((w) => w.startsWith(q)) || f.students.some((s) => s.name.toLowerCase().split(" ")[0].startsWith(q)));
+  if (!fam) return { ok: false as const, error: `No family or student called ${note.name}` };
+  const balance = fam.invoices.reduce((s, i) => s + Math.max(0, i.amount - sumPaid(i.payments)), 0);
+  return { ok: true as const, note, familyId: fam.id, parent: fam.parentName, balance, today: toKey(todayIST()) };
+}
