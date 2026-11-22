@@ -237,6 +237,41 @@ export async function deferBill(billId: string, days: number, reason = ""): Prom
   return { ok: true, message: `${bill.name} pushed by ${days} days` };
 }
 
+/** Morning Brief "Approve all": approves every actionable brief item, logs each to AgentAction, returns how many. */
+export async function approveAllBrief(): Promise<ActionResult & { count?: number }> {
+  const { loadDashboard } = await import("@/lib/board-view");
+  const { brief, board } = await loadDashboard();
+  const today = board.today;
+  const already = await db.agentAction.findMany({ where: { createdAt: { gte: addDays(today, 0) }, status: { in: ["APPROVED", "DONE"] }, reason: { startsWith: "brief:" } } });
+  const seen = new Set(already.map((a) => a.reason.split(" ")[0]));
+  let count = 0;
+  for (const item of brief) {
+    const tag = `brief:${item.key}`;
+    if (seen.has(tag)) continue;
+    if (item.type === "REMIND" || item.type === "FOLLOW_UP") {
+      await db.agentAction.create({
+        data: { type: item.type, familyId: item.familyId ?? null, title: item.title, detail: item.detail, reason: `${tag} ${item.reason}`, payload: JSON.stringify(item.payload ?? {}), status: "APPROVED", source: "RULES" },
+      });
+      count++;
+    } else if (item.type === "DUE_DATE" && item.familyId) {
+      const dueDay = Number(item.payload?.dueDay);
+      if (dueDay >= 1 && dueDay <= 28) {
+        await db.student.updateMany({ where: { familyId: item.familyId, active: true }, data: { dueDay } });
+        await db.agentAction.create({ data: { type: "DUE_DATE", familyId: item.familyId, title: item.title, reason: `${tag} ${item.reason}`, payload: JSON.stringify({ dueDay }), status: "DONE", source: "RULES" } });
+        count++;
+      }
+    }
+  }
+  // anything Munshi left waiting in the approval inbox that is not a money action is approved too
+  const pending = await db.agentAction.findMany({ where: { status: "PENDING", type: { in: ["REMIND", "FOLLOW_UP", "NOTE", "PROMISE"] } } });
+  for (const a of pending) {
+    await db.agentAction.update({ where: { id: a.id }, data: { status: "APPROVED" } });
+    count++;
+  }
+  refreshAll();
+  return { ok: true, count, message: count ? `Approved ${count} action${count > 1 ? "s" : ""}` : "Nothing left to approve" };
+}
+
 export async function logAgentAction(input: { type: string; title: string; detail?: string; reason?: string; familyId?: string; status?: string; source?: string }): Promise<ActionResult> {
   await db.agentAction.create({
     data: { type: input.type, title: input.title, detail: input.detail ?? "", reason: input.reason ?? "", familyId: input.familyId ?? null, status: input.status ?? "DONE", source: input.source ?? "RULES" },

@@ -1,6 +1,6 @@
 import { Card, EmptyState, Eyebrow, PageHeader } from "@/components/ui/Card";
 import { Guard } from "@/components/setup/Guard";
-import { BriefActions } from "@/components/munshi/BriefActions";
+import { ApproveAllBrief, BriefActions } from "@/components/munshi/BriefActions";
 import { AskMunshi, InboxButtons, PlanStepAction, ReplyReader } from "@/components/munshi/MunshiTools";
 import { loadDashboard } from "@/lib/board-view";
 import { buildRentPlan } from "@/lib/munshi/rules";
@@ -30,7 +30,10 @@ export default function MunshiPage() {
             <PageHeader title="Munshi" kicker={aiOn ? "AI clerk · online" : "Clerk · offline rules"} />
 
             <section>
-              <Eyebrow className="mb-2">Today&apos;s brief</Eyebrow>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <Eyebrow>Today&apos;s brief</Eyebrow>
+                {brief.length > 0 && <ApproveAllBrief />}
+              </div>
               {brief.length ? (
                 <Card className="divide-y divide-dusk-deep/10 p-0">
                   {brief.slice(0, 6).map((item) => (

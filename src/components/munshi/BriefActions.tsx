@@ -1,11 +1,11 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { RemindButton } from "@/components/actions/RemindButton";
 import { Button, LinkButton } from "@/components/ui/Button";
 import type { BriefItem } from "@/lib/munshi/rules";
 import type { ReminderPayload } from "@/lib/data";
-import { applyDueDate } from "@/app/actions";
+import { applyDueDate, approveAllBrief } from "@/app/actions";
 
 export function BriefActions({ item, payload }: { item: BriefItem; payload?: ReminderPayload }) {
   const [pending, start] = useTransition();
@@ -22,4 +22,25 @@ export function BriefActions({ item, payload }: { item: BriefItem; payload?: Rem
       </Button>
     );
   return null;
+}
+
+export function ApproveAllBrief() {
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+  return (
+    <div className="flex items-center gap-3">
+      {msg && <p className="font-mono text-[11px] text-plaster/70">{msg}</p>}
+      <Button
+        variant="plaster"
+        className="min-h-9 px-3"
+        disabled={pending}
+        onClick={() => start(async () => {
+          const r = await approveAllBrief();
+          setMsg(r.ok ? r.message ?? "Approved" : r.error);
+        })}
+      >
+        {pending ? "Approving…" : "Approve all"}
+      </Button>
+    </div>
+  );
 }
