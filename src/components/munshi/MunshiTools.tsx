@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { Button, inputClass, labelClass } from "@/components/ui/Button";
 import { RemindButton } from "@/components/actions/RemindButton";
-import { addPromise, askMunshiAction, deferBill, logAgentAction, readReplyAction, setActionStatus } from "@/app/actions";
+import { addPromise, askMunshiAction, deferBill, dismissRentPlan, logAgentAction, readReplyAction, setActionStatus, startRentPlan } from "@/app/actions";
 import { discountOfferText, waLink } from "@/lib/messages";
 import type { ReminderPayload } from "@/lib/data";
 import type { PlanStep } from "@/lib/munshi/rules";
@@ -38,6 +38,21 @@ export function PlanStepAction({ step, payload, discount }: { step: PlanStep; pa
       </Button>
     );
   return null;
+}
+
+export function PlanControls({ active }: { active: boolean }) {
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {active ? (
+        <Button variant="ghost" className="min-h-9 px-3" disabled={pending} onClick={() => start(async () => void (await dismissRentPlan()))}>End plan</Button>
+      ) : (
+        <Button variant="plaster" className="min-h-9 px-3" disabled={pending} onClick={() => start(async () => { const r = await startRentPlan(); if (!r.ok) setError(r.error); })}>{pending ? "Starting…" : "Start plan and track it"}</Button>
+      )}
+      {error && <p className="font-mono text-xs">{error}</p>}
+    </div>
+  );
 }
 
 export function InboxButtons({ id }: { id: string }) {

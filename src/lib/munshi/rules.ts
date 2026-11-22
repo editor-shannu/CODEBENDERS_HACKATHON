@@ -117,7 +117,7 @@ export function ordinal(n: number): string {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-export type PlanStep = { type: "REMIND" | "DISCOUNT" | "DEFER_BILL"; familyId?: string; billId?: string; title: string; detail: string; reason: string; payload: Record<string, unknown> };
+export type PlanStep = { type: "REMIND" | "DISCOUNT" | "DEFER_BILL"; familyId?: string; billId?: string; amount: number; title: string; detail: string; reason: string; payload: Record<string, unknown> };
 
 export function buildRentPlan(opts: {
   families: FamilyWithStats[];
@@ -141,6 +141,7 @@ export function buildRentPlan(opts: {
     steps.push({
       type: "REMIND",
       familyId: f.id,
+      amount: f.stats.balance,
       title: `Chase ${f.parentName} for ${formatINR(f.stats.balance)}`,
       detail: `${f.stats.suggestedTone[0] + f.stats.suggestedTone.slice(1).toLowerCase()} reminder with pay link`,
       reason: `${Math.round(likely * 100)}% likely to pay before rent day if reminded now.`,
@@ -156,6 +157,7 @@ export function buildRentPlan(opts: {
     steps.push({
       type: "DISCOUNT",
       familyId: f.id,
+      amount: Math.max(0, f.stats.monthlyTotal - 100),
       title: `Offer ${f.parentName.split(" ")[0]} ₹100 off to pay next month's ${formatINR(f.stats.monthlyTotal)} early`,
       detail: `Pay by ${formatDate(addDays(rentDate, -2), { year: false })}`,
       reason: `Pays on time every month (${f.stats.delays.length} of ${f.stats.delays.length}), so an early-pay offer is likely to land before rent.`,
@@ -172,6 +174,7 @@ export function buildRentPlan(opts: {
     steps.push({
       type: "DEFER_BILL",
       billId: flex.b.id,
+      amount: flex.b.amount,
       title: `Push "${flex.b.name}" (${formatINR(flex.b.amount)}) by a week`,
       detail: "Ask the vendor for 7 more days",
       reason: "It's marked flexible and falls just before rent.",

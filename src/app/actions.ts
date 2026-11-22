@@ -7,6 +7,7 @@ import { addDays, dateInMonth, fromKey, monthKey, todayIST, toKey } from "@/lib/
 import { familyMonthlyFee } from "@/lib/family-stats";
 import { computeStatus, sumPaid } from "@/lib/invoice-status";
 import { seedDemo } from "@/lib/seed-data";
+import { settlePlanForBill, settlePlanForPayment } from "@/lib/munshi/plan";
 import { billSchema, claimSchema, paymentSchema, promiseSchema, settingsSchema, studentSchema } from "@/lib/validators";
 
 export type ActionResult = { ok: true; message?: string; status?: string } | { ok: false; error: string };
@@ -37,6 +38,7 @@ export async function recordPayment(input: { invoiceId: string; amount: number; 
   if (amount > balance) return { ok: false, error: `Only ${balance} is due on this invoice` };
   await db.payment.create({ data: { invoiceId, amount, mode, reference: reference || null, date: fromKey(date) } });
   const status = await recalcInvoice(invoiceId);
+  await settlePlanForPayment(inv.familyId, amount);
   refreshAll();
   return { ok: true, status };
 }
@@ -206,9 +208,11 @@ export async function confirmClaim(id: string): Promise<ActionResult> {
   const claim = await db.paymentClaim.findUnique({ where: { id }, include: { invoice: { include: { payments: true } } } });
   if (!claim || claim.status !== "PENDING") return { ok: false, error: "Already handled" };
   const balance = claim.invoice.amount - sumPaid(claim.invoice.payments);
-  await db.payment.create({ data: { invoiceId: claim.invoiceId, amount: Math.min(balance, claim.amount), mode: "UPI", reference: claim.reference, date: todayIST() } });
+  const paid = Math.min(balance, claim.amount);
+  await db.payment.create({ data: { invoiceId: claim.invoiceId, amount: paid, mode: "UPI", reference: claim.reference, date: todayIST() } });
   await db.paymentClaim.update({ where: { id }, data: { status: "CONFIRMED" } });
   const status = await recalcInvoice(claim.invoiceId);
+  await settlePlanForPayment(claim.invoice.familyId, paid);
   refreshAll();
   return { ok: true, status };
 }
@@ -233,6 +237,7 @@ export async function deferBill(billId: string, days: number, reason = ""): Prom
   if (!bill) return { ok: false, error: "Bill not found" };
   await db.bill.update({ where: { id: billId }, data: { deferDays: Math.max(0, Math.min(20, days)) } });
   await db.agentAction.create({ data: { type: "DEFER_BILL", title: `Pushed "${bill.name}" by ${days} days`, reason, status: "DONE", source: "RULES" } });
+  await settlePlanForBill(billId);
   refreshAll();
   return { ok: true, message: `${bill.name} pushed by ${days} days` };
 }
@@ -311,16 +316,51 @@ export async function askMunshiAction(question: string) {
   return { ok: true as const, ...r };
 }
 
-export async function createPlanFromSteps(input: { title: string; goal: string; steps: { type: string; familyId?: string; title: string; detail: string; reason: string; payload: Record<string, unknown> }[] }): Promise<ActionResult> {
+export async function createPlanFromSteps(input: {
+  title: string;
+  goal: string;
+  status?: "PROPOSED" | "ACTIVE";
+  gap?: number;
+  rentAmount?: number;
+  rentDate?: string;
+  steps: { type: string; familyId?: string; title: string; detail: string; reason: string; payload: Record<string, unknown> }[];
+}): Promise<ActionResult> {
   await db.agentPlan.updateMany({ where: { status: { in: ["PROPOSED", "ACTIVE"] } }, data: { status: "DISMISSED" } });
   await db.agentPlan.create({
     data: {
       title: input.title,
       goal: input.goal,
-      status: "PROPOSED",
+      status: input.status ?? "PROPOSED",
+      gap: input.gap ?? 0,
+      rentAmount: input.rentAmount ?? 0,
+      rentDate: input.rentDate ?? "",
       actions: { create: input.steps.map((s, i) => ({ type: s.type, familyId: s.familyId ?? null, title: s.title, detail: s.detail, reason: s.reason, payload: JSON.stringify(s.payload), step: i + 1 })) },
     },
   });
   refreshAll();
-  return { ok: true, message: "Plan sent to your approval inbox" };
+  return { ok: true, message: input.status === "ACTIVE" ? "Rent Defense Plan started" : "Plan sent to your approval inbox" };
+}
+
+/** Builds today's Rent Defense Plan and persists it as an ACTIVE AgentPlan whose steps each carry a family and an amount. */
+export async function startRentPlan(): Promise<ActionResult> {
+  const { loadDashboard } = await import("@/lib/board-view");
+  const { buildRentPlan } = await import("@/lib/munshi/rules");
+  const { board, forecast } = await loadDashboard();
+  const plan = buildRentPlan({ families: board.families, forecast, bills: board.bills, today: board.today });
+  if (!plan || !forecast.rent) return { ok: false, error: "No rent bill to defend. Add one in Settings." };
+  return createPlanFromSteps({
+    title: plan.title,
+    goal: plan.goal,
+    status: "ACTIVE",
+    gap: plan.gap,
+    rentAmount: forecast.rent.amount,
+    rentDate: forecast.rent.date,
+    steps: plan.steps.map((s) => ({ type: s.type, familyId: s.familyId, title: s.title, detail: s.detail, reason: s.reason, payload: { ...s.payload, amount: s.amount, billId: s.billId, collected: 0 } })),
+  });
+}
+
+export async function dismissRentPlan(): Promise<ActionResult> {
+  await db.agentPlan.updateMany({ where: { status: { in: ["PROPOSED", "ACTIVE", "DONE"] } }, data: { status: "DISMISSED" } });
+  refreshAll();
+  return { ok: true };
 }

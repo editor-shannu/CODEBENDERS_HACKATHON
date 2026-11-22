@@ -129,6 +129,9 @@ model AgentPlan {
   title     String
   goal      String
   status    String        @default("PROPOSED") // PROPOSED | ACTIVE | DONE | DISMISSED
+  gap        Int          @default(0) // rupees the plan has to cover before rent day
+  rentAmount Int          @default(0)
+  rentDate   String       @default("") // YYYY-MM-DD (IST)
   createdAt DateTime      @default(now())
   actions   AgentAction[]
 }
