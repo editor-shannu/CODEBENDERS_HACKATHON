@@ -37,6 +37,15 @@ Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, Prisma + PostgreSQL
 
 ## Run it locally
 
+### One-click setup
+
+- **Windows:** double-click `setup.bat`
+- **macOS / Linux:** run `./setup.sh`
+
+It checks Node.js 20+ (installs it with winget on Windows if missing), installs packages, creates `.env` with a generated `AUTH_SECRET`, starts a local Postgres in Docker if Docker is running (otherwise asks you to paste a free [Neon](https://neon.tech) connection string), creates the tables, starts the app and opens the no-sign-in demo at `http://localhost:3000/api/demo`. Add a Groq key to `LLM_API_KEY` in `.env` for AI replies; without it Munshi uses offline rules.
+
+### Manual setup
+
 Requires Node.js 20+ and a PostgreSQL database (Neon, Supabase or local).
 
 ```bash
